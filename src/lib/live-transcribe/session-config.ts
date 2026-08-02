@@ -1,3 +1,4 @@
+import { isRegion } from "./regions";
 import {
   DEFAULT_SETTINGS,
   NOISE_REDUCTION_MODES,
@@ -10,11 +11,14 @@ import {
 /** Recommended model for low-latency live transcription (GA, July 2026). */
 export const LIVE_TRANSCRIBE_MODEL = "gpt-live-transcribe";
 
-export const CLIENT_SECRETS_URL =
-  "https://api.openai.com/v1/realtime/client_secrets";
-
-/** SDP offers are POSTed here. This endpoint takes NO query parameters. */
-export const REALTIME_CALLS_URL = "https://api.openai.com/v1/realtime/calls";
+/**
+ * Endpoint URLs are derived per-region in `regions.ts` — see
+ * `clientSecretsUrl()` and `realtimeCallsUrl()`. They are deliberately NOT
+ * constants here: a hardcoded host would silently override the selected
+ * region at one end of the chain.
+ *
+ * The calls endpoint takes no query parameters.
+ */
 
 /** The data channel name is load-bearing — it must be exactly this. */
 export const REALTIME_DATA_CHANNEL = "oai-events";
@@ -70,6 +74,7 @@ export function normaliseSettings(input: unknown): LiveTranscribeSettings {
       ? raw.noiseReduction
       : DEFAULT_SETTINGS.noiseReduction,
     languages: normaliseLanguages(raw.languages),
+    region: isRegion(raw.region) ? raw.region : DEFAULT_SETTINGS.region,
   };
 }
 

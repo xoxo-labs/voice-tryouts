@@ -38,6 +38,7 @@ export function RunHistory({
   const mixedModes =
     runs.some((run) => run.startMode === "cold") &&
     runs.some((run) => run.startMode === "warm");
+  const mixedRegions = new Set(runs.map((r) => r.settings.region)).size > 1;
 
   return (
     <div className="flex flex-col gap-6">
@@ -96,6 +97,9 @@ export function RunHistory({
           {mixedModes
             ? " History mixes cold and warm starts — setup medians average two different things."
             : ""}
+          {mixedRegions
+            ? " History mixes US and EU runs — filter by the region badge before drawing conclusions."
+            : ""}
         </p>
         <Button variant="ghost" size="sm" onClick={onClear}>
           Clear history
@@ -142,6 +146,12 @@ export function RunHistory({
                       </Badge>
                       <Badge variant="outline" className="font-mono text-[11px]">
                         {run.settings.languages.join("+")}
+                      </Badge>
+                      <Badge
+                        variant="outline"
+                        className="font-mono text-[11px] uppercase"
+                      >
+                        {run.settings.region}
                       </Badge>
                       <Badge
                         variant={

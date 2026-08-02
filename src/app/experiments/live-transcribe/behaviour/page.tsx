@@ -338,6 +338,83 @@ export default function BehaviourPage() {
       </Section>
 
       <Section
+        title="US vs EU endpoints"
+        description="Preliminary — n=6 per endpoint. Enough to raise a question, not to answer one."
+      >
+        <div className="flex flex-col gap-4 text-sm leading-6">
+          <p>
+            <code className="font-mono text-xs">eu.api.openai.com</code> returns
+            200 on a personal account, even though the documentation describes
+            data residency as gated behind enterprise approval and a signed
+            amendment. The endpoint answers anyway. Treat that as an
+            observation, not a guarantee — it may stop working without notice,
+            and the app reports an explicit &ldquo;not available for this
+            account&rdquo; message if it ever returns 403 or 404.
+          </p>
+
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Measurement</TableHead>
+                  <TableHead>api.openai.com</TableHead>
+                  <TableHead>eu.api.openai.com</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                <TableRow>
+                  <TableCell className="text-sm font-medium">
+                    Resolved IPs
+                  </TableCell>
+                  <TableCell className="font-mono text-xs">
+                    172.66.0.243, 162.159.140.245
+                  </TableCell>
+                  <TableCell className="font-mono text-xs">
+                    identical — same Cloudflare anycast
+                  </TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell className="text-sm font-medium">
+                    TLS handshake
+                  </TableCell>
+                  <TableCell className="font-mono text-sm">~66 ms</TableCell>
+                  <TableCell className="font-mono text-sm">~62–74 ms</TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell className="text-sm font-medium">
+                    Mint, median of 6
+                  </TableCell>
+                  <TableCell className="font-mono text-sm">
+                    265 ms{" "}
+                    <span className="text-muted-foreground">(250–419)</span>
+                  </TableCell>
+                  <TableCell className="font-mono text-sm">
+                    284 ms{" "}
+                    <span className="text-muted-foreground">(203–1859)</span>
+                  </TableCell>
+                </TableRow>
+              </TableBody>
+            </Table>
+          </div>
+
+          <p className="text-muted-foreground">
+            The medians are effectively equal. EU showed a much fatter tail, but
+            one 1.86 s outlier in six probes is not a finding. Both hostnames
+            hit the same edge, so any real difference lives in routing from that
+            edge to the origin — which TLS timings cannot see. That is precisely
+            why the selector exists: accumulate a few dozen runs in the history
+            and read those medians instead of trusting six probes.
+          </p>
+          <p className="text-muted-foreground">
+            The more informative number is the ICE round-trip reported by the
+            connection test. HTTPS terminates at a nearby CDN edge, but RTP goes
+            to real media servers — so the media path can be far away even when
+            the API edge answers in 66 ms.
+          </p>
+        </div>
+      </Section>
+
+      <Section
         title="What the model will not give you"
         description="Hard constraints. No configuration unlocks these."
       >

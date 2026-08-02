@@ -14,6 +14,10 @@
  * Docs: https://developers.openai.com/api/docs/guides/realtime-transcription
  */
 
+import { DEFAULT_REGION, type Region } from "./regions";
+
+export type { Region };
+
 /** Latency/accuracy dial. Higher = more audio context before emitting text. */
 export const TRANSCRIBE_DELAYS = [
   "minimal",
@@ -35,12 +39,19 @@ export interface LiveTranscribeSettings {
   noiseReduction: NoiseReductionMode;
   /** ISO 639-1 (`en`), selected ISO 639-3 (`yue`), or zh regional (`zh-cn`). */
   languages: string[];
+  /**
+   * Carried inside the settings so it reaches the mint request, the token
+   * cache key and the run record automatically. A secret minted in one region
+   * must never be used to connect to another.
+   */
+  region: Region;
 }
 
 export const DEFAULT_SETTINGS: LiveTranscribeSettings = {
   delay: "low",
   noiseReduction: "near_field",
   languages: ["en"],
+  region: DEFAULT_REGION,
 };
 
 /**
@@ -204,6 +215,38 @@ export type ConnectionStatus =
   | "connected"
   | "stopping"
   | "error";
+
+/**
+ * Verdict for one connection-test stage.
+ *
+ * `skip` exists so a stage can never be silently blank — the recurring failure
+ * mode this whole test exists to kill is a check that neither passed nor
+ * failed and left you guessing.
+ */
+export type StageStatus = "pending" | "running" | "pass" | "warn" | "fail" | "skip";
+
+export interface StageResult {
+  id: string;
+  label: string;
+  status: StageStatus;
+  /** Always populated in plain words, including for skips. Never empty. */
+  detail: string;
+  /** What to actually do about it, when something went wrong. */
+  remedy?: string;
+  durationMs?: number;
+  data?: Record<string, string | number | boolean | null>;
+}
+
+/** Active ICE candidate pair — where the media actually lands. */
+export interface IcePathInfo {
+  localType: string | null;
+  remoteType: string | null;
+  remoteAddress: string | null;
+  remotePort: number | null;
+  protocol: string | null;
+  /** The media-path round trip, in ms. The most informative single number. */
+  roundTripMs: number | null;
+}
 
 export interface TokenResponse {
   value: string;

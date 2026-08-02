@@ -2,6 +2,8 @@
 
 import ReactDOM from "react-dom";
 
+import { ALL_REGION_ORIGINS } from "@/lib/live-transcribe/regions";
+
 /**
  * Warms DNS + TLS to the OpenAI API before the user clicks Start, so the SDP
  * POST does not pay for connection setup.
@@ -12,7 +14,11 @@ import ReactDOM from "react-dom";
  * https://nextjs.org/docs/app/api-reference/functions/generate-metadata#resource-hints
  */
 export function PreloadResources() {
-  ReactDOM.prefetchDNS("https://api.openai.com");
-  ReactDOM.preconnect("https://api.openai.com", { crossOrigin: "anonymous" });
+  // Both region hosts, so switching region never pays a cold connection.
+  // They resolve to the same anycast IPs, making the second hint nearly free.
+  for (const origin of ALL_REGION_ORIGINS) {
+    ReactDOM.prefetchDNS(origin);
+    ReactDOM.preconnect(origin, { crossOrigin: "anonymous" });
+  }
   return null;
 }

@@ -34,8 +34,15 @@ import {
   type TranscribeDelay,
 } from "@/lib/live-transcribe/types";
 import { describeKey } from "@/lib/live-transcribe/token-cache";
+import {
+  DEFAULT_REGION,
+  REGION_INFO,
+  REGIONS,
+  type Region,
+} from "@/lib/live-transcribe/regions";
 import { cn } from "@/lib/utils";
 
+import { ConnectionTestPanel } from "./connection-test-panel";
 import { AudioStatsPanel, EventLog } from "./event-log";
 import { LanguagePicker } from "./language-picker";
 import { RunHistory } from "./run-history";
@@ -69,6 +76,7 @@ export function LiveTranscribeExperiment() {
   const [languages, setLanguages] = useState<string[]>(["en"]);
   const [micId, setMicId] = useState<string>(DEFAULT_MIC);
   const [startMode, setStartMode] = useState<StartMode>("cold");
+  const [region, setRegion] = useState<Region>(DEFAULT_REGION);
 
   const { devices, hasLabels, supported, refresh } = useAudioInputDevices();
 
@@ -107,8 +115,8 @@ export function LiveTranscribeExperiment() {
       : micId;
 
   const settings: LiveTranscribeSettings = useMemo(
-    () => ({ delay, noiseReduction, languages }),
-    [delay, noiseReduction, languages],
+    () => ({ delay, noiseReduction, languages, region }),
+    [delay, noiseReduction, languages, region],
   );
 
   // Keep a secret hot for the current settings. The cache is keyed on the
@@ -246,6 +254,33 @@ export function LiveTranscribeExperiment() {
           <Separator />
 
           <div className="flex flex-col gap-2">
+            <Label htmlFor="region">API region</Label>
+            <Select
+              value={region}
+              onValueChange={(value) => setRegion(value as Region)}
+              disabled={isActive}
+            >
+              <SelectTrigger id="region" className="w-full sm:w-96">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {REGIONS.map((option) => (
+                  <SelectItem key={option} value={option}>
+                    {REGION_INFO[option].label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-muted-foreground text-xs">
+              {REGION_INFO[region].note} The region is applied to both the token
+              mint and the SDP connection, so a run never straddles two
+              endpoints.
+            </p>
+          </div>
+
+          <Separator />
+
+          <div className="flex flex-col gap-2">
             <Label htmlFor="start-mode">Start mode</Label>
             <div className="flex flex-wrap items-center gap-3">
               <Select
@@ -352,6 +387,24 @@ export function LiveTranscribeExperiment() {
               <span>{error}</span>
             </div>
           ) : null}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Connection test</CardTitle>
+          <CardDescription>
+            Checks every link in the chain and says exactly which one broke.
+            Nothing here is ever left ambiguous — a check that cannot run
+            reports why it was skipped.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ConnectionTestPanel
+            settings={settings}
+            capture={capture}
+            disabled={isActive}
+          />
         </CardContent>
       </Card>
 

@@ -6,10 +6,15 @@ import type { LiveTranscribeSettings } from "./types";
  * created with. Changing `delay`, `noise_reduction` or `languages` must
  * invalidate the cache — hence keying on the settings, not just on time.
  *
+ * Region is part of the key too, and critically so: a secret minted against
+ * the US endpoint would otherwise be reused for a connection to the EU one,
+ * silently invalidating any region comparison.
+ *
  * Languages are sorted so `["en","ro"]` and `["ro","en"]` share a cache entry.
  */
 export function settingsKey(settings: LiveTranscribeSettings): string {
   return JSON.stringify([
+    settings.region,
     settings.delay,
     settings.noiseReduction,
     [...settings.languages].sort(),
@@ -43,12 +48,13 @@ export function isUsable(
 export function describeKey(key: string | null): string {
   if (!key) return "—";
   try {
-    const [delay, noise, languages] = JSON.parse(key) as [
+    const [region, delay, noise, languages] = JSON.parse(key) as [
+      string,
       string,
       string,
       string[],
     ];
-    return `${delay} · ${noise} · ${languages.join("+")}`;
+    return `${region} · ${delay} · ${noise} · ${languages.join("+")}`;
   } catch {
     return key;
   }

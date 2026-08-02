@@ -8,10 +8,8 @@ import {
   ONSET,
   type OnsetDetector,
 } from "@/lib/live-transcribe/onset";
-import {
-  REALTIME_CALLS_URL,
-  REALTIME_DATA_CHANNEL,
-} from "@/lib/live-transcribe/session-config";
+import { realtimeCallsUrl } from "@/lib/live-transcribe/regions";
+import { REALTIME_DATA_CHANNEL } from "@/lib/live-transcribe/session-config";
 import {
   isUsable,
   settingsKey,
@@ -876,7 +874,8 @@ export function useLiveTranscribe(): UseLiveTranscribeResult {
         // from the browser — no query parameters on this URL.
         setStatus("connecting");
         mark("sdpStart");
-        const sdpResponse = await fetch(REALTIME_CALLS_URL, {
+        // Same region the secret was minted for — see regions.ts.
+        const sdpResponse = await fetch(realtimeCallsUrl(settings.region), {
           method: "POST",
           body: localSdp,
           headers: {
