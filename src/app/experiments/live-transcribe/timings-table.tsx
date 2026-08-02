@@ -26,10 +26,16 @@ export function TimingsTable({
       <div className="overflow-x-auto">
       <Table>
         <TableHeader>
-          <TableRow>
-            <TableHead className="w-[46%]">Stage</TableHead>
-            <TableHead className="text-right">From start()</TableHead>
-            <TableHead className="text-right">Step</TableHead>
+          <TableRow className="hover:bg-transparent">
+            <TableHead className="text-muted-foreground w-[46%] font-mono text-[11px] tracking-[0.14em] uppercase">
+              Stage
+            </TableHead>
+            <TableHead className="text-muted-foreground text-right font-mono text-[11px] tracking-[0.14em] uppercase">
+              From start()
+            </TableHead>
+            <TableHead className="text-muted-foreground text-right font-mono text-[11px] tracking-[0.14em] uppercase">
+              Step
+            </TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>

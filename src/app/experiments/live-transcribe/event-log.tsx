@@ -1,6 +1,5 @@
 "use client";
 
-import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { formatMs } from "@/lib/live-transcribe/timings";
 import type {
@@ -27,7 +26,7 @@ export function LevelMeterBar({ meter }: { meter: LevelMeter }) {
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-baseline justify-between gap-4">
-        <span className="text-muted-foreground text-xs font-medium">
+        <span className="text-muted-foreground font-mono text-[11px] tracking-[0.14em] uppercase">
           Input level
         </span>
         <span className="font-mono text-xs tabular-nums">
@@ -45,7 +44,7 @@ export function LevelMeterBar({ meter }: { meter: LevelMeter }) {
           className={cn(
             "h-full rounded-full transition-[width] duration-75",
             meter.threshold != null && meter.rms > meter.threshold
-              ? "bg-primary"
+              ? "bg-amber-500"
               : "bg-muted-foreground/40",
           )}
           style={{ width: `${pct}%` }}
@@ -67,7 +66,7 @@ export function LevelMeterBar({ meter }: { meter: LevelMeter }) {
   );
 }
 
-function StatTile({
+function StatReadout({
   label,
   value,
   hint,
@@ -79,22 +78,21 @@ function StatTile({
   alarm?: boolean;
 }) {
   return (
-    <div
-      className={cn(
-        "rounded-lg border p-3",
-        alarm && "border-destructive/40 bg-destructive/5",
-      )}
-    >
-      <div className="text-muted-foreground text-xs font-medium">{label}</div>
-      <div
+    <div className="flex flex-col gap-0.5">
+      <span className="text-muted-foreground font-mono text-[11px] tracking-[0.14em] uppercase">
+        {label}
+      </span>
+      <span
         className={cn(
-          "mt-1 font-mono text-lg tabular-nums",
+          "font-mono text-lg font-medium tabular-nums",
           alarm && "text-destructive",
         )}
       >
         {value}
-      </div>
-      <div className="text-muted-foreground mt-1 text-xs">{hint}</div>
+      </span>
+      <span className="text-muted-foreground/80 font-mono text-[11px]">
+        {hint}
+      </span>
     </div>
   );
 }
@@ -132,20 +130,20 @@ export function AudioStatsPanel({
   return (
     <div className="flex flex-col gap-4">
       {meter ? <LevelMeterBar meter={meter} /> : null}
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <StatTile
+      <div className="grid grid-cols-2 gap-x-8 gap-y-5 lg:grid-cols-4">
+        <StatReadout
           label="Packets sent"
           value={stats.packetsSent.toLocaleString()}
           hint="outbound-rtp"
           alarm={notSending}
         />
-        <StatTile
+        <StatReadout
           label="Bytes sent"
           value={stats.bytesSent.toLocaleString()}
           hint="outbound-rtp"
           alarm={notSending}
         />
-        <StatTile
+        <StatReadout
           label="Input level"
           value={
             stats.audioLevel == null ? "—" : stats.audioLevel.toFixed(4)
@@ -153,7 +151,7 @@ export function AudioStatsPanel({
           hint="media-source audioLevel"
           alarm={silent}
         />
-        <StatTile
+        <StatReadout
           label="Total energy"
           value={
             stats.totalAudioEnergy == null
@@ -197,33 +195,36 @@ export function EventLog({ events }: { events: LoggedEvent[] }) {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap gap-2">
-        {[...counts.entries()].map(([type, count]) => (
-          <Badge key={type} variant="outline" className="font-mono text-[11px]">
-            {type} ×{count}
-          </Badge>
-        ))}
-      </div>
+      {/* Frequency summary as one dense mono line, not a badge cloud. */}
+      <p className="text-muted-foreground font-mono text-[11px] leading-5">
+        {[...counts.entries()]
+          .map(([type, count]) => `${type} ×${count}`)
+          .join("   ")}
+      </p>
 
-      <div className="max-h-96 overflow-y-auto rounded-lg border">
-        <ul className="divide-y">
+      <div className="max-h-96 overflow-y-auto border-y">
+        <ul className="divide-border/60 divide-y">
           {events.map((event) => (
-            <li key={event.id} className="px-3 py-1.5">
+            <li key={event.id} className="py-1">
               <details className="group">
                 <summary className="flex cursor-pointer items-baseline gap-3 text-sm marker:content-['']">
-                  <span className="text-muted-foreground w-16 shrink-0 text-right font-mono text-xs tabular-nums">
+                  <span className="text-muted-foreground/70 w-16 shrink-0 text-right font-mono text-[11px] tabular-nums">
                     {formatMs(event.at)}
                   </span>
                   <span
                     className={cn(
                       "font-mono text-xs break-all",
-                      event.expected ? "text-foreground" : "text-amber-600",
+                      event.expected
+                        ? event.type.startsWith("→")
+                          ? "text-muted-foreground"
+                          : "text-foreground"
+                        : "font-semibold text-amber-600 dark:text-amber-500",
                     )}
                   >
                     {event.type}
                   </span>
                   {!event.expected ? (
-                    <span className="ml-auto shrink-0 text-[10px] tracking-wide text-amber-600 uppercase">
+                    <span className="ml-auto shrink-0 font-mono text-[10px] tracking-wide text-amber-600 uppercase dark:text-amber-500">
                       unexpected
                     </span>
                   ) : null}

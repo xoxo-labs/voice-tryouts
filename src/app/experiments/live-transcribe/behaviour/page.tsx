@@ -2,14 +2,6 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 
-import { Badge } from "@/components/ui/badge";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import {
   Table,
   TableBody,
@@ -137,6 +129,10 @@ const PRICING = [
   },
 ];
 
+/**
+ * Lab-notebook section: mono uppercase marker, a hairline, generous space.
+ * No boxes — this is reference documentation, not a dashboard.
+ */
 function Section({
   title,
   description,
@@ -147,21 +143,25 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{title}</CardTitle>
+    <section className="flex flex-col gap-4 border-t pt-6">
+      <div className="flex flex-col gap-1.5">
+        <h2 className="text-muted-foreground font-mono text-[11px] tracking-[0.14em] uppercase">
+          {title}
+        </h2>
         {description ? (
-          <CardDescription className="leading-6">{description}</CardDescription>
+          <p className="text-muted-foreground max-w-2xl text-sm leading-6">
+            {description}
+          </p>
         ) : null}
-      </CardHeader>
-      <CardContent>{children}</CardContent>
-    </Card>
+      </div>
+      {children}
+    </section>
   );
 }
 
 export default function BehaviourPage() {
   return (
-    <main className="mx-auto flex w-full max-w-4xl flex-1 flex-col gap-6 px-6 py-12">
+    <main className="mx-auto flex w-full max-w-4xl flex-1 flex-col gap-10 px-6 py-12">
       <div className="flex flex-col gap-4">
         <Link
           href="/experiments/live-transcribe"
@@ -172,7 +172,7 @@ export default function BehaviourPage() {
         </Link>
 
         <div className="flex flex-col gap-3">
-          <h1 className="text-3xl font-semibold tracking-tight">
+          <h1 className="text-4xl font-bold tracking-tight">
             How this model actually behaves
           </h1>
           <p className="text-muted-foreground max-w-2xl leading-7">
@@ -180,13 +180,9 @@ export default function BehaviourPage() {
             the documentation. Where the two disagree, this page describes what
             the API did.
           </p>
-          <div className="flex flex-wrap gap-2">
-            <Badge variant="secondary" className="font-mono">
-              {LIVE_TRANSCRIBE_MODEL}
-            </Badge>
-            <Badge variant="outline">WebRTC</Badge>
-            <Badge variant="outline">verified Aug 2026</Badge>
-          </div>
+          <p className="text-muted-foreground font-mono text-[11px] leading-5 tracking-wide">
+            {LIVE_TRANSCRIBE_MODEL} · webrtc · verified aug 2026
+          </p>
         </div>
       </div>
 
@@ -207,8 +203,8 @@ export default function BehaviourPage() {
             <code className="font-mono text-xs">input_audio_buffer.commit</code></strong>,
             which is what produces the final transcript.
           </p>
-          <div className="border-amber-500/40 bg-amber-500/5 rounded-lg border p-4">
-            <p className="font-medium">
+          <div className="border-l-2 border-amber-500 py-1 pl-4">
+            <p className="font-bold">
               The consequence you will actually notice
             </p>
             <p className="text-muted-foreground mt-1">
@@ -456,11 +452,15 @@ export default function BehaviourPage() {
               {PRICING.map((row) => (
                 <TableRow key={row.model}>
                   <TableCell className="font-mono text-xs">
-                    {row.model}
                     {row.current ? (
-                      <Badge variant="secondary" className="ml-2 text-[10px]">
+                      <span className="font-bold">{row.model}</span>
+                    ) : (
+                      row.model
+                    )}
+                    {row.current ? (
+                      <span className="text-muted-foreground ml-2 text-[10px] tracking-wide uppercase">
                         in use
-                      </Badge>
+                      </span>
                     ) : null}
                   </TableCell>
                   <TableCell className="text-right font-mono text-sm tabular-nums">

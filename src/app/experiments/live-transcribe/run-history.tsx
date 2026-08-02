@@ -1,6 +1,5 @@
 "use client";
 
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -59,25 +58,26 @@ export function RunHistory({
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      {/* Stat readouts: figures separated by space, not boxes. Hierarchy is
+          carried by the size jump between the primary metric and the rest. */}
+      <div className="grid grid-cols-2 gap-x-8 gap-y-6 sm:grid-cols-3">
         {HEADLINE_METRICS.map((metric) => {
           const stats = computeStats(comparable, metric.select);
           return (
             <div
               key={metric.key}
               className={cn(
-                "rounded-lg border p-3",
-                metric.primary && "border-foreground/30 bg-muted/40",
-                metric.contaminated && "opacity-70",
+                "flex flex-col gap-0.5",
+                metric.contaminated && "opacity-60",
               )}
             >
-              <div className="flex items-baseline justify-between gap-2">
-                <span className="text-muted-foreground text-xs font-medium">
+              <div className="flex items-baseline gap-2">
+                <span className="text-muted-foreground font-mono text-[11px] tracking-[0.14em] uppercase">
                   {metric.label}
                 </span>
                 {metric.contaminated ? (
                   <span
-                    className="shrink-0 text-[10px] tracking-wide text-amber-600 uppercase"
+                    className="shrink-0 font-mono text-[10px] tracking-wide text-amber-600 uppercase dark:text-amber-500"
                     title="Includes human reaction time — not comparable across delay settings."
                   >
                     noisy
@@ -86,22 +86,19 @@ export function RunHistory({
               </div>
               <div
                 className={cn(
-                  "mt-1 font-mono tabular-nums",
-                  metric.primary ? "text-2xl font-semibold" : "text-xl",
+                  "font-mono tabular-nums",
+                  metric.primary
+                    ? "text-3xl font-bold tracking-tight"
+                    : "text-lg font-medium",
                 )}
               >
                 {stats ? formatMs(stats.p50) : "—"}
               </div>
-              <div className="text-muted-foreground mt-1 font-mono text-xs tabular-nums">
+              <div className="text-muted-foreground/80 font-mono text-[11px] tabular-nums">
                 {stats
                   ? `min ${formatMs(stats.min)} · max ${formatMs(stats.max)} · n=${stats.count}`
                   : metric.hint}
               </div>
-              {stats ? (
-                <div className="text-muted-foreground mt-0.5 text-xs">
-                  {metric.hint}
-                </div>
-              ) : null}
             </div>
           );
         })}
@@ -124,21 +121,35 @@ export function RunHistory({
       <div className="overflow-x-auto">
         <Table>
           <TableHeader>
-            <TableRow>
-              <TableHead>#</TableHead>
-              <TableHead>Settings</TableHead>
-              <TableHead>Microphone</TableHead>
-              <TableHead className="text-right">Ready</TableHead>
-              <TableHead className="text-right" title="speech onset → first delta">
-                TTFW
-              </TableHead>
-              <TableHead
-                className="text-right"
-                title="start() → first delta, includes reaction time"
-              >
-                start→delta
-              </TableHead>
-              <TableHead className="text-right">Utterances</TableHead>
+            <TableRow className="hover:bg-transparent">
+              {(
+                [
+                  ["#", ""],
+                  ["Settings", ""],
+                  ["Microphone", ""],
+                  ["Ready", "text-right"],
+                  ["TTFW", "text-right"],
+                  ["start→delta", "text-right"],
+                  ["Utt.", "text-right"],
+                ] as const
+              ).map(([label, align]) => (
+                <TableHead
+                  key={label}
+                  className={cn(
+                    "text-muted-foreground font-mono text-[11px] tracking-[0.14em] uppercase",
+                    align,
+                  )}
+                  title={
+                    label === "TTFW"
+                      ? "speech onset → first delta"
+                      : label === "start→delta"
+                        ? "start() → first delta, includes reaction time"
+                        : undefined
+                  }
+                >
+                  {label}
+                </TableHead>
+              ))}
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -163,44 +174,30 @@ export function RunHistory({
                     {run.index}
                   </TableCell>
                   <TableCell>
-                    <div className="flex flex-wrap items-center gap-1">
-                      <Badge variant="outline" className="font-mono text-[11px]">
-                        {run.settings.delay}
-                      </Badge>
-                      <Badge variant="outline" className="font-mono text-[11px]">
-                        {run.settings.noiseReduction}
-                      </Badge>
-                      <Badge variant="outline" className="font-mono text-[11px]">
-                        {run.settings.languages.length > 0
+                    <span
+                      className="text-muted-foreground font-mono text-[11px]"
+                      title={
+                        run.tokenSource === "cache"
+                          ? "Token served from cache"
+                          : "Token minted over the network"
+                      }
+                    >
+                      {[
+                        run.settings.delay,
+                        run.settings.noiseReduction,
+                        run.settings.languages.length > 0
                           ? run.settings.languages.join("+")
-                          : "auto"}
-                      </Badge>
-                      <Badge
-                        variant="outline"
-                        className="font-mono text-[11px] uppercase"
-                      >
-                        {run.settings.region}
-                      </Badge>
-                      <Badge
-                        variant={
-                          run.startMode === "warm" ? "secondary" : "outline"
-                        }
-                        className="font-mono text-[11px]"
-                        title={
-                          run.tokenSource === "cache"
-                            ? "Token served from cache"
-                            : "Token minted over the network"
-                        }
-                      >
-                        {run.startMode}
-                        {run.tokenSource === "cache" ? " ⚡" : ""}
-                      </Badge>
-                      {run.error ? (
-                        <Badge variant="destructive" className="text-[11px]">
-                          error
-                        </Badge>
-                      ) : null}
-                    </div>
+                          : "auto",
+                        run.settings.region,
+                        run.startMode +
+                          (run.tokenSource === "cache" ? "·cached" : ""),
+                      ].join(" · ")}
+                    </span>
+                    {run.error ? (
+                      <span className="text-destructive ml-2 font-mono text-[11px] tracking-wide uppercase">
+                        error
+                      </span>
+                    ) : null}
                   </TableCell>
                   <TableCell
                     className="max-w-48 truncate text-xs"
