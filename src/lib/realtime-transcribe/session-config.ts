@@ -3,9 +3,11 @@ import {
   DEFAULT_SETTINGS,
   NOISE_REDUCTION_MODES,
   TRANSCRIBE_DELAYS,
+  TRANSPORTS,
   type LiveTranscribeSettings,
   type NoiseReductionMode,
   type TranscribeDelay,
+  type TransportKind,
 } from "./types";
 
 /** Recommended model for low-latency live transcription (GA, July 2026). */
@@ -65,6 +67,10 @@ function isNoiseReduction(value: unknown): value is NoiseReductionMode {
   return NOISE_REDUCTION_MODES.includes(value as NoiseReductionMode);
 }
 
+function isTransport(value: unknown): value is TransportKind {
+  return TRANSPORTS.includes(value as TransportKind);
+}
+
 /** Coerce untrusted request JSON into settings we are willing to send on. */
 export function normaliseSettings(input: unknown): LiveTranscribeSettings {
   const raw = (input ?? {}) as Record<string, unknown>;
@@ -75,6 +81,11 @@ export function normaliseSettings(input: unknown): LiveTranscribeSettings {
       : DEFAULT_SETTINGS.noiseReduction,
     languages: normaliseLanguages(raw.languages),
     region: isRegion(raw.region) ? raw.region : DEFAULT_SETTINGS.region,
+    // The mint payload never uses this, but normalised settings round-trip
+    // into cache keys and run records, so it must survive normalisation.
+    transport: isTransport(raw.transport)
+      ? raw.transport
+      : DEFAULT_SETTINGS.transport,
   };
 }
 

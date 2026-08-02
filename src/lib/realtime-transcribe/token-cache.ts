@@ -11,9 +11,14 @@ import type { LiveTranscribeSettings } from "./types";
  * silently invalidating any region comparison.
  *
  * Languages are sorted so `["en","ro"]` and `["ro","en"]` share a cache entry.
+ *
+ * Transport is in the key for the benchmark's sake, not the token's: the
+ * secret itself is transport-agnostic, but statistics grouped by this key must
+ * never average a WebRTC run with a WS one.
  */
 export function settingsKey(settings: LiveTranscribeSettings): string {
   return JSON.stringify([
+    settings.transport,
     settings.region,
     settings.delay,
     settings.noiseReduction,
@@ -48,13 +53,16 @@ export function isUsable(
 export function describeKey(key: string | null): string {
   if (!key) return "—";
   try {
-    const [region, delay, noise, languages] = JSON.parse(key) as [
+    const [transport, region, delay, noise, languages] = JSON.parse(key) as [
+      string,
       string,
       string,
       string,
       string[],
     ];
-    return `${region} · ${delay} · ${noise} · ${languages.join("+")}`;
+    return `${transport} · ${region} · ${delay} · ${noise} · ${
+      languages.length > 0 ? languages.join("+") : "auto"
+    }`;
   } catch {
     return key;
   }

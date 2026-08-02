@@ -3,7 +3,7 @@ import Link from "next/link";
 import { ArrowLeft, ArrowRight, BookOpen } from "lucide-react";
 
 import { getExperiment } from "@/lib/experiments";
-import { LIVE_TRANSCRIBE_MODEL } from "@/lib/live-transcribe/session-config";
+import { LIVE_TRANSCRIBE_MODEL } from "@/lib/realtime-transcribe";
 
 import { LiveTranscribeExperiment } from "./live-transcribe-experiment";
 import { PreloadResources } from "./preload-resources";

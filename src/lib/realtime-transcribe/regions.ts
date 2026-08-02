@@ -7,11 +7,15 @@
  * token minted in one region used against another measures nothing real while
  * looking perfectly healthy.
  *
- * Empirical note: `eu.api.openai.com` responds 200 on at least one non-
- * enterprise account, even though the documentation describes data residency
- * as gated behind enterprise approval. Both hostnames resolve to the same
- * Cloudflare anycast IPs with identical TLS handshake times, so any difference
- * lives in routing to the origin, not at the edge.
+ * Empirical note: `eu.api.openai.com` ACCEPTS the full chain on a
+ * non-approved account — mint 200, SDP 201, data channel opens,
+ * session.created arrives, RTP flows — and then transcribes NOTHING.
+ * Confirmed with real speech on a physical microphone, not just synthetic
+ * audio. The documented enterprise gating evidently applies at inference,
+ * not at the door: instead of a 403 you get a perfect handshake and eternal
+ * silence. Both hostnames resolve to the same Cloudflare anycast IPs with
+ * identical TLS handshake times; ironically the EU media path is *closer*
+ * (73-81 ms RTT vs 170-183 ms on US) — and unusable.
  */
 
 export const REGIONS = ["us", "eu"] as const;
@@ -41,7 +45,7 @@ export const REGION_INFO: Record<Region, RegionInfo> = {
     label: "EU — eu.api.openai.com",
     host: "eu.api.openai.com",
     baseUrl: "https://eu.api.openai.com",
-    note: "Data-residency endpoint. Documented as enterprise-gated, but observed working on a personal account.",
+    note: "Data-residency endpoint. Confirmed on a non-approved account: the full handshake succeeds but nothing is ever transcribed — mint and stream look healthy, no deltas arrive. Expect silence unless your org has data-residency approval.",
   },
 };
 

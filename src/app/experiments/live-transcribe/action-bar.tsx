@@ -7,8 +7,8 @@ import {
   formatMs,
   timeToFirstWord,
   ttfwInvalidReason,
-} from "@/lib/live-transcribe/timings";
-import type { ConnectionStatus, RunMarks } from "@/lib/live-transcribe/types";
+} from "@/lib/realtime-transcribe";
+import type { ConnectionStatus, RunMarks } from "@/lib/realtime-transcribe";
 import { cn } from "@/lib/utils";
 
 const STATUS_LABEL: Record<ConnectionStatus, string> = {

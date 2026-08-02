@@ -5,7 +5,7 @@ import {
   REGION_INFO,
   regionBaseUrl,
   type Region,
-} from "@/lib/live-transcribe/regions";
+} from "@/lib/realtime-transcribe";
 
 /**
  * Server-side half of the connection test: is the key present, and does the

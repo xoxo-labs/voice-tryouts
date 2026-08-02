@@ -10,14 +10,15 @@ import {
 } from "@/components/ui/tabs";
 import { useAudioInputDevices } from "@/hooks/use-audio-input-devices";
 import { useLiveTranscribe } from "@/hooks/use-live-transcribe";
-import { DEFAULT_REGION, type Region } from "@/lib/live-transcribe/regions";
+import { DEFAULT_REGION, type Region } from "@/lib/realtime-transcribe";
 import type {
   CaptureSettings,
   LiveTranscribeSettings,
   NoiseReductionMode,
   StartMode,
   TranscribeDelay,
-} from "@/lib/live-transcribe/types";
+  TransportKind,
+} from "@/lib/realtime-transcribe";
 import { cn } from "@/lib/utils";
 
 import { ActionBar } from "./action-bar";
@@ -29,7 +30,11 @@ import { DEFAULT_MIC, SettingsSidebar } from "./settings-sidebar";
 import { TimingsTable } from "./timings-table";
 import { TranscriptPanel } from "./transcript-panel";
 
-export function LiveTranscribeExperiment() {
+export function LiveTranscribeExperiment({
+  defaultTransport = "webrtc",
+}: {
+  defaultTransport?: TransportKind;
+}) {
   const [delay, setDelay] = useState<TranscribeDelay>("low");
   const [noiseReduction, setNoiseReduction] =
     useState<NoiseReductionMode>("near_field");
@@ -37,6 +42,7 @@ export function LiveTranscribeExperiment() {
   const [micId, setMicId] = useState<string>(DEFAULT_MIC);
   const [startMode, setStartMode] = useState<StartMode>("cold");
   const [region, setRegion] = useState<Region>(DEFAULT_REGION);
+  const [transport, setTransport] = useState<TransportKind>(defaultTransport);
   const [testHasFailures, setTestHasFailures] = useState(false);
 
   const {
@@ -82,8 +88,8 @@ export function LiveTranscribeExperiment() {
       : micId;
 
   const settings: LiveTranscribeSettings = useMemo(
-    () => ({ delay, noiseReduction, languages, region }),
-    [delay, noiseReduction, languages, region],
+    () => ({ delay, noiseReduction, languages, region, transport }),
+    [delay, noiseReduction, languages, region, transport],
   );
 
   // Keep a secret hot for the current settings. The cache is keyed on the
@@ -155,6 +161,8 @@ export function LiveTranscribeExperiment() {
             onRefreshDevices={refresh}
             startMode={startMode}
             onStartModeChange={setStartMode}
+            transport={transport}
+            onTransportChange={setTransport}
             tokenCache={tokenCache}
           />
         </div>
@@ -196,7 +204,11 @@ export function LiveTranscribeExperiment() {
                 relative to the <code className="font-mono text-xs">start()</code>{" "}
                 call.
               </SectionNote>
-              <TimingsTable marks={marks} tokenSource={tokenSource} />
+              <TimingsTable
+                marks={marks}
+                tokenSource={tokenSource}
+                transport={transport}
+              />
             </section>
 
             <section className="flex flex-col gap-3">

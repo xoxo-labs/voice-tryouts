@@ -34,6 +34,20 @@ export const NOISE_REDUCTION_MODES = ["near_field", "far_field", "off"] as const
 
 export type NoiseReductionMode = (typeof NOISE_REDUCTION_MODES)[number];
 
+/**
+ * How audio reaches the API.
+ * - `webrtc`   — peer connection carries the audio; events on a data channel.
+ * - `ws`       — WebSocket; the client captures, downsamples and appends
+ *                base64 PCM16 manually.
+ * - `ws-preroll` — `ws`, plus capture starts the instant `start()` is called
+ *                (before the token exists). Everything spoken during setup is
+ *                buffered locally and flushed at `session.created`, so no
+ *                words are lost and setup becomes perceptually invisible.
+ */
+export const TRANSPORTS = ["webrtc", "ws", "ws-preroll"] as const;
+
+export type TransportKind = (typeof TRANSPORTS)[number];
+
 export interface LiveTranscribeSettings {
   delay: TranscribeDelay;
   noiseReduction: NoiseReductionMode;
@@ -45,6 +59,12 @@ export interface LiveTranscribeSettings {
    * must never be used to connect to another.
    */
   region: Region;
+  /**
+   * Not part of the OpenAI session config (the mint ignores it), but part of
+   * the settings object so it flows into the cache key and run records — runs
+   * on different transports must never be averaged together.
+   */
+  transport: TransportKind;
 }
 
 export const DEFAULT_SETTINGS: LiveTranscribeSettings = {
@@ -52,6 +72,7 @@ export const DEFAULT_SETTINGS: LiveTranscribeSettings = {
   noiseReduction: "near_field",
   languages: ["en"],
   region: DEFAULT_REGION,
+  transport: "webrtc",
 };
 
 /**
@@ -71,8 +92,14 @@ export interface RunMarks {
   connected?: number;
   /** `oai-events` data channel opened */
   dcOpen?: number;
+  /** WS transports: local capture pipeline started producing chunks. */
+  captureStart?: number;
+  /** WS transports: socket open. */
+  wsOpen?: number;
   /** `session.created` server event */
   sessionCreated?: number;
+  /** ws-preroll: the locally buffered audio finished flushing to the API. */
+  prerollFlushed?: number;
   /**
    * First moment local audio rose above the measured silence baseline — i.e.
    * when the user actually started talking. Detected client-side, because the
@@ -191,6 +218,8 @@ export interface RunRecord {
   startMode: StartMode;
   tokenSource: TokenSource;
   utteranceCount: number;
+  /** ws-preroll: how much audio was buffered locally before the flush. */
+  prerollMs: number | null;
   error: string | null;
 }
 

@@ -9,17 +9,23 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
-import { deriveStages, formatMs } from "@/lib/live-transcribe/timings";
-import type { RunMarks, TokenSource } from "@/lib/live-transcribe/types";
+import { deriveStages, formatMs } from "@/lib/realtime-transcribe";
+import type {
+  RunMarks,
+  TokenSource,
+  TransportKind,
+} from "@/lib/realtime-transcribe";
 
 export function TimingsTable({
   marks,
   tokenSource,
+  transport,
 }: {
   marks: RunMarks;
   tokenSource: TokenSource;
+  transport: TransportKind;
 }) {
-  const stages = deriveStages(marks, tokenSource);
+  const stages = deriveStages(marks, tokenSource, transport);
 
   return (
     <div className="flex flex-col gap-3">

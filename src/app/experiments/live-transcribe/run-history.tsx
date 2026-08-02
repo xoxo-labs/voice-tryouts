@@ -9,18 +9,18 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { settingsKey } from "@/lib/live-transcribe/token-cache";
+import { settingsKey } from "@/lib/realtime-transcribe";
 import {
   computeStats,
   formatMs,
-  HEADLINE_METRICS,
+  headlineMetrics,
   timeToFirstWord,
-} from "@/lib/live-transcribe/timings";
+} from "@/lib/realtime-transcribe";
 import type {
   LiveTranscribeSettings,
   RunRecord,
   StartMode,
-} from "@/lib/live-transcribe/types";
+} from "@/lib/realtime-transcribe";
 import { cn } from "@/lib/utils";
 
 export function RunHistory({
@@ -55,13 +55,14 @@ export function RunHistory({
       settingsKey(run.settings) === currentKey,
   );
   const excluded = runs.length - comparable.length;
+  const metrics = headlineMetrics(currentSettings.transport);
 
   return (
     <div className="flex flex-col gap-6">
       {/* Stat readouts: figures separated by space, not boxes. Hierarchy is
           carried by the size jump between the primary metric and the rest. */}
       <div className="grid grid-cols-2 gap-x-8 gap-y-6 sm:grid-cols-3">
-        {HEADLINE_METRICS.map((metric) => {
+        {metrics.map((metric) => {
           const stats = computeStats(comparable, metric.select);
           return (
             <div
@@ -183,6 +184,7 @@ export function RunHistory({
                       }
                     >
                       {[
+                        run.settings.transport,
                         run.settings.delay,
                         run.settings.noiseReduction,
                         run.settings.languages.length > 0
@@ -191,6 +193,9 @@ export function RunHistory({
                         run.settings.region,
                         run.startMode +
                           (run.tokenSource === "cache" ? "·cached" : ""),
+                        ...(run.prerollMs != null
+                          ? [`preroll ${formatMs(run.prerollMs)}`]
+                          : []),
                       ].join(" · ")}
                     </span>
                     {run.error ? (

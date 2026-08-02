@@ -1,14 +1,14 @@
-import { readIcePath } from "./ice-stats";
-import { computeRms } from "./onset";
-import { realtimeCallsUrl, REGION_INFO } from "./regions";
-import { REALTIME_DATA_CHANNEL } from "./session-config";
-import { createSyntheticSource } from "./synthetic-audio";
+import { readIcePath } from "@/lib/realtime-transcribe";
+import { computeRms } from "@/lib/realtime-transcribe";
+import { realtimeCallsUrl, REGION_INFO } from "@/lib/realtime-transcribe";
+import { REALTIME_DATA_CHANNEL } from "@/lib/realtime-transcribe";
+import { createSyntheticSource } from "@/lib/realtime-transcribe";
 import type {
   CaptureSettings,
   IcePathInfo,
   LiveTranscribeSettings,
   StageResult,
-} from "./types";
+} from "@/lib/realtime-transcribe";
 
 /**
  * End-to-end connection test.
@@ -527,11 +527,20 @@ export async function runConnectionTest(
     running("datachannel");
     await pc.setRemoteDescription({ type: "answer", sdp: answerSdp });
     const handshakeUntil = performance.now() + HANDSHAKE_TIMEOUT_MS;
+    let handshakeLastTick = 0;
     while (
       (!dcOpen || !sessionCreated) &&
       performance.now() < handshakeUntil &&
       !signal.aborted
     ) {
+      // Re-report each second with the time left — a silent spinner for the
+      // whole window is indistinguishable from a hang, which is the exact
+      // ambiguity this test exists to remove.
+      const secondsLeft = Math.ceil((handshakeUntil - performance.now()) / 1000);
+      if (secondsLeft !== handshakeLastTick) {
+        handshakeLastTick = secondsLeft;
+        running("datachannel", `Waiting for the channel… ${secondsLeft}s left`);
+      }
       await wait(50);
     }
 
@@ -582,12 +591,21 @@ export async function runConnectionTest(
     // Round trip
     running("roundtrip");
     const roundtripUntil = performance.now() + ROUNDTRIP_TIMEOUT_MS;
+    let roundtripLastTick = 0;
     while (
       deltaCount === 0 &&
       performance.now() < roundtripUntil &&
       !signal.aborted &&
       !serverError
     ) {
+      // Same countdown treatment as the handshake wait: on EU this window
+      // always runs to exhaustion, and 15 s of bare "Checking…" reads as a
+      // freeze rather than a deliberate wait.
+      const secondsLeft = Math.ceil((roundtripUntil - performance.now()) / 1000);
+      if (secondsLeft !== roundtripLastTick) {
+        roundtripLastTick = secondsLeft;
+        running("roundtrip", `Waiting for deltas… ${secondsLeft}s left`);
+      }
       await wait(100);
     }
 
@@ -646,7 +664,7 @@ export async function runConnectionTest(
           {
             data: { packetsSent, deltas: 0 },
             remedy:
-              "Run a normal session and speak — if real speech also produces nothing, the problem is upstream.",
+              "Run a normal session and speak — if real speech also produces nothing, the problem is upstream. On eu.api.openai.com this is the expected outcome for accounts without data-residency approval: the handshake succeeds, the stream stays silent (confirmed with real speech).",
           },
         ),
       );

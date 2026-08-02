@@ -1,11 +1,11 @@
 import type { NextRequest } from "next/server";
 
-import { clientSecretsUrl, REGION_INFO } from "@/lib/live-transcribe/regions";
+import { clientSecretsUrl, REGION_INFO } from "@/lib/realtime-transcribe";
 import {
   buildTranscriptionSession,
   CLIENT_SECRET_TTL_SECONDS,
   normaliseSettings,
-} from "@/lib/live-transcribe/session-config";
+} from "@/lib/realtime-transcribe";
 
 /**
  * Mints a short-lived Realtime client secret (`ek_...`) for the browser.

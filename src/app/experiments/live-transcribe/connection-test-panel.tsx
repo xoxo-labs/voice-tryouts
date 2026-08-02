@@ -15,7 +15,7 @@ import type {
   LiveTranscribeSettings,
   StageResult,
   StageStatus,
-} from "@/lib/live-transcribe/types";
+} from "@/lib/realtime-transcribe";
 import { cn } from "@/lib/utils";
 
 /**

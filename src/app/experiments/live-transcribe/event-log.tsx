@@ -1,12 +1,12 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { formatMs } from "@/lib/live-transcribe/timings";
+import { formatMs } from "@/lib/realtime-transcribe";
 import type {
   AudioStats,
   LevelMeter,
   LoggedEvent,
-} from "@/lib/live-transcribe/types";
+} from "@/lib/realtime-transcribe";
 
 /**
  * Live mic level against the calibrated silence floor. Makes the speech-onset

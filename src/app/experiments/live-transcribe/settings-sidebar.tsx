@@ -20,16 +20,18 @@ import {
   REGION_INFO,
   REGIONS,
   type Region,
-} from "@/lib/live-transcribe/regions";
-import { describeKey } from "@/lib/live-transcribe/token-cache";
+} from "@/lib/realtime-transcribe";
+import { describeKey } from "@/lib/realtime-transcribe";
 import {
   NOISE_REDUCTION_MODES,
   TRANSCRIBE_DELAYS,
+  TRANSPORTS,
   type NoiseReductionMode,
   type StartMode,
   type TokenCacheState,
   type TranscribeDelay,
-} from "@/lib/live-transcribe/types";
+  type TransportKind,
+} from "@/lib/realtime-transcribe";
 import { cn } from "@/lib/utils";
 
 import { LanguagePicker } from "./language-picker";
@@ -42,6 +44,20 @@ const NOISE_REDUCTION_LABEL: Record<NoiseReductionMode, string> = {
   near_field: "near_field — headset",
   far_field: "far_field — laptop / room",
   off: "off — no filtering",
+};
+
+const TRANSPORT_LABEL: Record<TransportKind, string> = {
+  webrtc: "webrtc — peer connection",
+  ws: "ws — manual PCM append",
+  "ws-preroll": "ws + pre-roll — capture from the press",
+};
+
+const TRANSPORT_NOTE: Record<TransportKind, string> = {
+  webrtc:
+    "The browser's media stack carries the audio. Nothing spoken during setup is transcribed.",
+  ws: "The app captures, downsamples and appends PCM manually. Pre-session audio is discarded — the control condition for pre-roll.",
+  "ws-preroll":
+    "Capture starts the instant you press Start; everything said during setup is buffered and flushed at session.created. Speak immediately — that is the point.",
 };
 
 export interface SettingsSidebarProps {
@@ -63,6 +79,8 @@ export interface SettingsSidebarProps {
   onRefreshDevices: () => void;
   startMode: StartMode;
   onStartModeChange: (value: StartMode) => void;
+  transport: TransportKind;
+  onTransportChange: (value: TransportKind) => void;
   tokenCache: TokenCacheState;
 }
 
@@ -86,6 +104,8 @@ function Fields(props: SettingsSidebarProps) {
     onRefreshDevices,
     startMode,
     onStartModeChange,
+    transport,
+    onTransportChange,
     tokenCache,
   } = props;
 
@@ -208,6 +228,31 @@ function Fields(props: SettingsSidebarProps) {
         <SectionLabel>Connection</SectionLabel>
 
         <div className="flex flex-col gap-1.5">
+          <Label htmlFor="transport" className="text-xs">
+            Transport
+          </Label>
+          <Select
+            value={transport}
+            onValueChange={(value) => onTransportChange(value as TransportKind)}
+            disabled={disabled}
+          >
+            <SelectTrigger id="transport" className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {TRANSPORTS.map((option) => (
+                <SelectItem key={option} value={option}>
+                  {TRANSPORT_LABEL[option]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="text-muted-foreground text-xs">
+            {TRANSPORT_NOTE[transport]}
+          </p>
+        </div>
+
+        <div className="flex flex-col gap-1.5">
           <Label htmlFor="region" className="text-xs">
             API region
           </Label>
@@ -289,7 +334,7 @@ export function SettingsSidebar(props: SettingsSidebarProps) {
   return (
     <>
       {/* Mobile: collapsed by default. */}
-      <Collapsible className="bg-muted/40 rounded-lg lg:hidden">
+      <Collapsible className="bg-muted/60 ring-border/60 rounded-lg ring-1 lg:hidden">
         <CollapsibleTrigger className="flex w-full items-center gap-2 p-4 text-sm font-medium">
           <Settings2 className="size-4" aria-hidden />
           Session settings
@@ -304,7 +349,7 @@ export function SettingsSidebar(props: SettingsSidebarProps) {
       </Collapsible>
 
       {/* Desktop: always visible, sticky. */}
-      <div className="bg-muted/40 sticky top-6 hidden max-h-[calc(100vh-3rem)] flex-col gap-6 overflow-y-auto rounded-lg p-5 lg:flex">
+      <div className="bg-muted/60 ring-border/60 sticky top-6 hidden max-h-[calc(100vh-3rem)] flex-col gap-6 overflow-y-auto rounded-lg p-5 ring-1 lg:flex">
         <div className="flex flex-col gap-2">
           <SectionLabel>Session settings</SectionLabel>
           <p className="text-muted-foreground text-xs leading-5">

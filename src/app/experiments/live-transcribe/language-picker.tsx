@@ -16,7 +16,7 @@ import { COMMON_LANGUAGES, findLanguage } from "@/lib/live-transcribe/languages"
 import {
   isValidLanguageCode,
   MAX_LANGUAGES,
-} from "@/lib/live-transcribe/session-config";
+} from "@/lib/realtime-transcribe";
 import { cn } from "@/lib/utils";
 
 export function LanguagePicker({

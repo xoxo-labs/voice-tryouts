@@ -2,7 +2,7 @@
 
 import ReactDOM from "react-dom";
 
-import { ALL_REGION_ORIGINS } from "@/lib/live-transcribe/regions";
+import { ALL_REGION_ORIGINS } from "@/lib/realtime-transcribe";
 
 /**
  * Warms DNS + TLS to the OpenAI API before the user clicks Start, so the SDP

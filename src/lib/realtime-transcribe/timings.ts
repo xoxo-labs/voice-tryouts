@@ -1,4 +1,9 @@
-import type { RunMarks, RunRecord, TokenSource } from "./types";
+import type {
+  RunMarks,
+  RunRecord,
+  TokenSource,
+  TransportKind,
+} from "./types";
 
 export interface TimingStage {
   key: string;
@@ -74,9 +79,12 @@ export function ttfwInvalidReason(marks: RunMarks): string | null {
 export function deriveStages(
   marks: RunMarks,
   tokenSource: TokenSource = "network",
+  transport: TransportKind = "webrtc",
 ): TimingStage[] {
   const fromCache = tokenSource === "cache";
-  return [
+  const isWs = transport !== "webrtc";
+
+  const shared: TimingStage[] = [
     {
       key: "token",
       label: fromCache ? "Ephemeral token (cached)" : "Ephemeral token",
@@ -97,47 +105,102 @@ export function deriveStages(
       deltaKind: "duration",
       parallel: true,
     },
-    {
-      key: "offerReady",
-      label: "SDP offer ready",
-      description: "createOffer + setLocalDescription",
-      at: marks.offerReady,
-      delta: diff(marks.offerReady, marks.micEnd),
-      deltaKind: "since-previous",
-      parallel: true,
-    },
-    {
-      key: "sdp",
-      label: "SDP exchange",
-      description: "POST /v1/realtime/calls",
-      at: marks.sdpEnd,
-      delta: diff(marks.sdpEnd, marks.sdpStart),
-      deltaKind: "duration",
-    },
-    {
-      key: "connected",
-      label: "Peer connected",
-      description: "pc.connectionState === 'connected' (ICE/DTLS)",
-      at: marks.connected,
-      delta: diff(marks.connected, marks.sdpEnd),
-      deltaKind: "since-previous",
-    },
-    {
-      key: "dcOpen",
-      label: "Data channel open",
-      description: "'oai-events' channel ready",
-      at: marks.dcOpen,
-      delta: diff(marks.dcOpen, marks.connected),
-      deltaKind: "since-previous",
-    },
-    {
-      key: "sessionCreated",
-      label: "session.created",
-      description: "First server event on the channel",
-      at: marks.sessionCreated,
-      delta: diff(marks.sessionCreated, marks.dcOpen),
-      deltaKind: "since-previous",
-    },
+  ];
+
+  const transportStages: TimingStage[] = isWs
+    ? [
+        {
+          key: "captureStart",
+          label:
+            transport === "ws-preroll"
+              ? "Capture + buffering started"
+              : "Capture started",
+          description:
+            transport === "ws-preroll"
+              ? "AudioWorklet live — audio is being buffered before the session exists"
+              : "AudioWorklet live — pre-session audio is discarded in plain ws mode",
+          at: marks.captureStart,
+          delta: diff(marks.captureStart, marks.micEnd),
+          deltaKind: "since-previous",
+          parallel: true,
+        },
+        {
+          key: "wsOpen",
+          label: "WebSocket open",
+          description: "wss://…/v1/realtime — auth via subprotocol",
+          at: marks.wsOpen,
+          delta: diff(marks.wsOpen, marks.tokenEnd),
+          deltaKind: "since-previous",
+        },
+        {
+          key: "sessionCreated",
+          label: "session.created",
+          description: "First server event on the socket",
+          at: marks.sessionCreated,
+          delta: diff(marks.sessionCreated, marks.wsOpen),
+          deltaKind: "since-previous",
+        },
+        ...(transport === "ws-preroll"
+          ? [
+              {
+                key: "prerollFlushed",
+                label: "Pre-roll flushed",
+                description:
+                  "entire local backlog appended — nothing said during setup was lost",
+                at: marks.prerollFlushed,
+                delta: diff(marks.prerollFlushed, marks.sessionCreated),
+                deltaKind: "since-previous",
+              } satisfies TimingStage,
+            ]
+          : []),
+      ]
+    : [
+        {
+          key: "offerReady",
+          label: "SDP offer ready",
+          description: "createOffer + setLocalDescription",
+          at: marks.offerReady,
+          delta: diff(marks.offerReady, marks.micEnd),
+          deltaKind: "since-previous",
+          parallel: true,
+        },
+        {
+          key: "sdp",
+          label: "SDP exchange",
+          description: "POST /v1/realtime/calls",
+          at: marks.sdpEnd,
+          delta: diff(marks.sdpEnd, marks.sdpStart),
+          deltaKind: "duration",
+        },
+        {
+          key: "connected",
+          label: "Peer connected",
+          description: "pc.connectionState === 'connected' (ICE/DTLS)",
+          at: marks.connected,
+          delta: diff(marks.connected, marks.sdpEnd),
+          deltaKind: "since-previous",
+        },
+        {
+          key: "dcOpen",
+          label: "Data channel open",
+          description: "'oai-events' channel ready",
+          at: marks.dcOpen,
+          delta: diff(marks.dcOpen, marks.connected),
+          deltaKind: "since-previous",
+        },
+        {
+          key: "sessionCreated",
+          label: "session.created",
+          description: "First server event on the channel",
+          at: marks.sessionCreated,
+          delta: diff(marks.sessionCreated, marks.dcOpen),
+          deltaKind: "since-previous",
+        },
+      ];
+
+  return [
+    ...shared,
+    ...transportStages,
     {
       key: "firstSpeech",
       label: "First speech detected (server)",
@@ -185,65 +248,105 @@ export function deriveStages(
   ];
 }
 
+export interface HeadlineMetric {
+  key: string;
+  label: string;
+  hint: string;
+  primary: boolean;
+  contaminated: boolean;
+  select: (m: RunMarks) => number | undefined;
+}
+
 /**
- * The numbers worth comparing across runs, most meaningful first.
+ * The numbers worth comparing across runs, most meaningful first — and the
+ * meaning depends on the transport.
  *
- * Only the `primary` metric is safe to use when comparing `delay` settings.
- * The `contaminated` ones still include human reaction time and are kept for
- * continuity, but are labelled so nobody reads them as model latency.
+ * For ws-preroll the headline is PERCEIVED TTFW: button press → first delta.
+ * That is exactly the number pre-roll exists to shrink, and because capture
+ * starts at the press, speaking immediately makes it a fair measurement
+ * rather than a reaction-time contaminated one. On the other transports the
+ * same interval mostly measures how long the user waited for setup plus
+ * their own reaction, so it stays demoted and flagged noisy.
  */
-export const HEADLINE_METRICS = [
-  {
+export function headlineMetrics(transport: TransportKind): HeadlineMetric[] {
+  const preroll = transport === "ws-preroll";
+
+  const perceived: HeadlineMetric = {
+    key: "perceived",
+    label: "Perceived TTFW",
+    hint: "button press → first delta",
+    primary: preroll,
+    contaminated: !preroll,
+    select: (m) => m.firstDelta,
+  };
+  const ttfw: HeadlineMetric = {
     key: "ttfw",
     label: "Time to first word",
     hint: "speech onset → first delta",
-    primary: true,
+    primary: !preroll,
     contaminated: false,
     select: timeToFirstWord,
-  },
-  {
-    key: "finalise",
-    label: "Commit → completed",
-    hint: "server finalisation latency",
-    primary: false,
-    contaminated: false,
-    select: (m: RunMarks) => diff(m.firstCompleted, m.firstCommit),
-  },
-  {
-    key: "ready",
-    label: "Ready to stream",
-    hint: "start() → session.created",
-    primary: false,
-    contaminated: false,
-    select: (m: RunMarks) => m.sessionCreated,
-  },
-  {
-    key: "connect",
-    label: "Connection setup",
-    hint: "start() → peer connected",
-    primary: false,
-    contaminated: false,
-    select: (m: RunMarks) => m.connected,
-  },
-  {
-    key: "startToDelta",
-    label: "start() → first delta",
-    hint: "includes how long you waited before speaking",
-    primary: false,
-    contaminated: true,
-    select: (m: RunMarks) => m.firstDelta,
-  },
-  {
-    key: "readyToDelta",
-    label: "session.created → first delta",
-    hint: "also includes reaction time",
-    primary: false,
-    contaminated: true,
-    select: (m: RunMarks) => diff(m.firstDelta, m.sessionCreated),
-  },
-] as const;
+  };
 
-export type HeadlineMetricKey = (typeof HEADLINE_METRICS)[number]["key"];
+  return [
+    ...(preroll ? [perceived, ttfw] : [ttfw]),
+    {
+      key: "finalise",
+      label: "Commit → completed",
+      hint: "server finalisation latency",
+      primary: false,
+      contaminated: false,
+      select: (m) => diff(m.firstCompleted, m.firstCommit),
+    },
+    {
+      key: "ready",
+      label: "Ready to stream",
+      hint: "start() → session.created",
+      primary: false,
+      contaminated: false,
+      select: (m) => m.sessionCreated,
+    },
+    transport === "webrtc"
+      ? {
+          key: "connect",
+          label: "Connection setup",
+          hint: "start() → peer connected",
+          primary: false,
+          contaminated: false,
+          select: (m) => m.connected,
+        }
+      : {
+          key: "connect",
+          label: "Socket open",
+          hint: "start() → WebSocket open",
+          primary: false,
+          contaminated: false,
+          select: (m) => m.wsOpen,
+        },
+    ...(preroll
+      ? [
+          {
+            key: "flushDelay",
+            label: "Flush latency",
+            hint: "session.created → backlog flushed",
+            primary: false,
+            contaminated: false,
+            select: (m: RunMarks) => diff(m.prerollFlushed, m.sessionCreated),
+          },
+        ]
+      : [perceived]),
+    {
+      key: "readyToDelta",
+      label: "session.created → first delta",
+      hint: preroll
+        ? "includes chewing through the flushed backlog"
+        : "also includes reaction time",
+      primary: false,
+      contaminated: !preroll,
+      select: (m) => diff(m.firstDelta, m.sessionCreated),
+    },
+  ];
+}
 
 export interface MetricStats {
   count: number;

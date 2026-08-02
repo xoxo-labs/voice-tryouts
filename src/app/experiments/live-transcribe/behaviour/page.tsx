@@ -10,7 +10,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { LIVE_TRANSCRIBE_MODEL } from "@/lib/live-transcribe/session-config";
+import { LIVE_TRANSCRIBE_MODEL } from "@/lib/realtime-transcribe";
 
 import { TextLifecycleDiagram } from "./text-lifecycle-diagram";
 
@@ -335,17 +335,22 @@ export default function BehaviourPage() {
 
       <Section
         title="US vs EU endpoints"
-        description="Preliminary — n=6 per endpoint. Enough to raise a question, not to answer one."
+        description="Latency figures preliminary (n=6 per endpoint). EU-does-not-transcribe: confirmed with real speech."
       >
         <div className="flex flex-col gap-4 text-sm leading-6">
           <p>
-            <code className="font-mono text-xs">eu.api.openai.com</code> returns
-            200 on a personal account, even though the documentation describes
-            data residency as gated behind enterprise approval and a signed
-            amendment. The endpoint answers anyway. Treat that as an
-            observation, not a guarantee — it may stop working without notice,
-            and the app reports an explicit &ldquo;not available for this
-            account&rdquo; message if it ever returns 403 or 404.
+            <code className="font-mono text-xs">eu.api.openai.com</code>{" "}
+            accepts the entire chain on a non-approved account — mint 200, SDP
+            201, data channel open,{" "}
+            <code className="font-mono text-xs">session.created</code>, RTP
+            flowing — <strong>and never produces a single delta.</strong>{" "}
+            Confirmed with real speech on a physical microphone, not just the
+            synthetic test signal. The documented enterprise gating evidently
+            applies at inference rather than at authentication: instead of a
+            403 at the door you get a flawless handshake and eternal silence —
+            the silent-failure archetype this project keeps meeting. The irony:
+            the EU media path is <em>closer</em> (73&ndash;81&nbsp;ms RTT vs
+            170&ndash;183&nbsp;ms on US), and unusable.
           </p>
 
           <div className="overflow-x-auto">

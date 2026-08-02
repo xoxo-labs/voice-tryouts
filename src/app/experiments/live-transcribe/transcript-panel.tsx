@@ -1,6 +1,6 @@
 "use client";
 
-import type { Utterance } from "@/lib/live-transcribe/types";
+import type { Utterance } from "@/lib/realtime-transcribe";
 import { cn } from "@/lib/utils";
 
 /**
