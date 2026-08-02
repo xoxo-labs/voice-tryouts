@@ -78,6 +78,10 @@ export function TimingsTable({
                   <span className="text-xs tracking-wide uppercase">n/a</span>
                 ) : stage.delta == null ? (
                   "—"
+                ) : stage.delta < 0 ? (
+                  // Negative gap: this stage completed before its reference
+                  // point (e.g. speech onset before session.created).
+                  <>−{formatMs(Math.abs(stage.delta))}</>
                 ) : (
                   <>
                     {stage.deltaKind === "since-previous" ? "+" : ""}

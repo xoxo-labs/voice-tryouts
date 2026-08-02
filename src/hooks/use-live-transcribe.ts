@@ -340,7 +340,15 @@ export function useLiveTranscribe(): UseLiveTranscribeResult {
     [mintToken],
   );
 
-  /** Resolve a usable secret, from cache when warm and still valid. */
+  /**
+   * Resolve a usable secret, from cache when warm and still valid.
+   *
+   * The token source is recorded HERE, at the moment the decision is made —
+   * not after the surrounding Promise.allSettled, which also waits on
+   * getUserMedia (seconds, on a first permission prompt). Setting it late
+   * showed "network · 0 ms" for cache hits in the interim, and a warm run
+   * failing before allSettled archived the wrong source permanently.
+   */
   const acquireToken = useCallback(
     async (
       settings: LiveTranscribeSettings,
@@ -353,9 +361,13 @@ export function useLiveTranscribe(): UseLiveTranscribeResult {
       const cached = cacheRef.current;
       if (mode === "warm" && isUsable(cached, key)) {
         mark("tokenEnd");
+        tokenSourceRef.current = "cache";
+        setTokenSource("cache");
         return { value: cached.value, source: "cache" };
       }
 
+      tokenSourceRef.current = "network";
+      setTokenSource("network");
       const token = await mintToken(settings, signal);
       mark("tokenEnd");
       return { value: token.value, source: "network" };
@@ -432,9 +444,16 @@ export function useLiveTranscribe(): UseLiveTranscribeResult {
     }
   }, []);
 
-  /** Close the active run, archive its timings, and reset transport state. */
+  /**
+   * Close the active run, archive its timings, and reset transport state.
+   *
+   * `skipPrewarm` is passed when a new start is already in flight ("Run again"
+   * during an active session): that start mints its own token, and a prewarm
+   * kicked off here would race it — a redundant double mint plus a flickering
+   * cache badge.
+   */
   const endRun = useCallback(
-    (errorMessage: string | null) => {
+    (errorMessage: string | null, opts?: { skipPrewarm?: boolean }) => {
       if (!activeRef.current) return;
       activeRef.current = false;
       runIdRef.current += 1;
@@ -458,7 +477,9 @@ export function useLiveTranscribe(): UseLiveTranscribeResult {
       }
 
       // Re-mint straight away so the next warm run still starts hot.
-      if (startModeRef.current === "warm") prewarm(settingsRef.current);
+      if (startModeRef.current === "warm" && !opts?.skipPrewarm) {
+        prewarm(settingsRef.current);
+      }
 
       setIsTranscribing(false);
       if (errorMessage) {
@@ -570,6 +591,7 @@ export function useLiveTranscribe(): UseLiveTranscribeResult {
   const pollAudioStats = useCallback(async () => {
     const pc = pcRef.current;
     if (!pc) return;
+    const runId = runIdRef.current;
 
     let report: RTCStatsReport;
     try {
@@ -577,6 +599,10 @@ export function useLiveTranscribe(): UseLiveTranscribeResult {
     } catch {
       return;
     }
+
+    // getStats resolved after the run ended (or a new one started): these
+    // counters belong to a dead peer connection — do not display them.
+    if (runIdRef.current !== runId || pcRef.current !== pc) return;
 
     let next: AudioStats = {
       packetsSent: 0,
@@ -639,7 +665,7 @@ export function useLiveTranscribe(): UseLiveTranscribeResult {
       mode: StartMode = "cold",
     ) => {
       // Fast start/stop toggling must never leave an orphaned peer connection.
-      if (activeRef.current) endRun(null);
+      if (activeRef.current) endRun(null, { skipPrewarm: true });
 
       const runId = ++runIdRef.current;
       const isStale = () => runIdRef.current !== runId;
@@ -865,10 +891,10 @@ export function useLiveTranscribe(): UseLiveTranscribeResult {
         if (tokenOutcome.status === "rejected") throw tokenOutcome.reason;
         if (captureOutcome.status === "rejected") throw captureOutcome.reason;
 
-        const { value: ephemeralKey, source } = tokenOutcome.value;
+        // Token source was already recorded inside acquireToken, at the
+        // moment the cache-vs-network decision was made.
+        const { value: ephemeralKey } = tokenOutcome.value;
         const { localSdp } = captureOutcome.value;
-        tokenSourceRef.current = source;
-        setTokenSource(source);
 
         // SDP exchange. The ephemeral key authenticates this request directly
         // from the browser — no query parameters on this URL.

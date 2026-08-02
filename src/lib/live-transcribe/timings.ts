@@ -42,11 +42,28 @@ function diff(a: number | undefined, b: number | undefined) {
  */
 export function timeToFirstWord(marks: RunMarks): number | undefined {
   if (marks.firstDelta == null || marks.speechOnset == null) return undefined;
+  // Onset detected AFTER the first delta means the detector mis-calibrated —
+  // typically because the user was already talking during the calibration
+  // window, which folds speech into the baseline and pushes the threshold
+  // above speaking level. A negative TTFW is not a fast run, it is a broken
+  // measurement: discard it rather than clamping to 0, which would fabricate
+  // an impossibly good number and silently drag the p50 the other way.
+  if (marks.speechOnset > marks.firstDelta) return undefined;
   const from =
     marks.sessionCreated == null
       ? marks.speechOnset
       : Math.max(marks.speechOnset, marks.sessionCreated);
   return marks.firstDelta - from;
+}
+
+/** Why a run has no usable TTFW, for honest display instead of a bare "—". */
+export function ttfwInvalidReason(marks: RunMarks): string | null {
+  if (marks.firstDelta == null) return null; // nothing transcribed yet
+  if (marks.speechOnset == null)
+    return "no speech onset detected — level analysis unavailable or mic silent";
+  if (marks.speechOnset > marks.firstDelta)
+    return "onset detected after the first delta — calibration captured speech, measurement discarded";
+  return null;
 }
 
 /**
@@ -133,7 +150,9 @@ export function deriveStages(
     {
       key: "speechOnset",
       label: "Speech onset (local)",
-      description: "mic level crossed the calibrated silence threshold",
+      description:
+        ttfwInvalidReason(marks) ??
+        "mic level crossed the calibrated silence threshold",
       at: marks.speechOnset,
       delta: diff(marks.speechOnset, marks.sessionCreated),
       deltaKind: "since-previous",
@@ -257,6 +276,20 @@ export function computeStats(
     p50: median(values),
     max: Math.max(...values),
   };
+}
+
+/**
+ * The only run set it is honest to aggregate: successful runs whose settings
+ * match the ones currently selected. Averaging a `delay: minimal` run with a
+ * `delay: xhigh` one would erase the very difference this tool exists to
+ * measure — and errored runs carry partial marks that skew everything.
+ */
+export function comparableRuns(
+  runs: RunRecord[],
+  currentKey: string,
+  keyOf: (run: RunRecord) => string,
+): RunRecord[] {
+  return runs.filter((run) => run.error == null && keyOf(run) === currentKey);
 }
 
 export function formatMs(value: number | undefined): string {

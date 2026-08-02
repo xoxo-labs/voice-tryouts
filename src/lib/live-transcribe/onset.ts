@@ -1,5 +1,3 @@
-import { median } from "./timings";
-
 /**
  * Speech-onset detection parameters.
  *
@@ -13,6 +11,12 @@ export const ONSET = {
   sampleMs: 50,
   /** Opening window used to measure the room's silence floor. */
   calibrationMs: 400,
+  /**
+   * Samples in the first part of the window are discarded: a fresh
+   * AudioContext can deliver zeroed buffers while it warms up, and folding
+   * those into the baseline would drag it to digital zero.
+   */
+  warmupMs: 100,
   /** Consecutive above-threshold samples required, so a keyboard click or
    *  chair creak cannot register as speech. */
   sustainSamples: 3,
@@ -21,6 +25,20 @@ export const ONSET = {
   /** Lower bound, for when the baseline calibrates to (near) digital zero. */
   absoluteFloor: 0.0006,
 } as const;
+
+/**
+ * The silence floor is a LOW percentile of the calibration window, not the
+ * median. If the user is already talking during calibration, the median
+ * absorbs the speech and the threshold lands above speaking level — onset
+ * then fires late (or never), after the first transcript delta, and the run's
+ * TTFW is unusable. The 20th percentile reads the quiet gaps between words,
+ * which keeps the floor honest even with speech over most of the window.
+ */
+function silenceFloor(samples: number[]): number {
+  if (samples.length === 0) return 0;
+  const sorted = [...samples].sort((a, b) => a - b);
+  return sorted[Math.floor(sorted.length * 0.2)];
+}
 
 export interface OnsetDetector {
   readonly baseline: number | null;
@@ -57,14 +75,14 @@ export function createOnsetDetector(startedAt: number): OnsetDetector {
     push(rms: number, now: number) {
       if (onsetAt != null) return null;
 
-      // Still listening to the room.
+      // Still listening to the room. AudioContext warmup buffers are skipped.
       if (now - startedAt < ONSET.calibrationMs) {
-        calibration.push(rms);
+        if (now - startedAt >= ONSET.warmupMs) calibration.push(rms);
         return null;
       }
 
       if (baseline == null) {
-        baseline = calibration.length > 0 ? median(calibration) : 0;
+        baseline = silenceFloor(calibration);
         threshold = Math.max(
           baseline * ONSET.baselineMultiplier,
           ONSET.absoluteFloor,

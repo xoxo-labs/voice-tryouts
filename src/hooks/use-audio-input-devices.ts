@@ -14,13 +14,20 @@ export interface AudioInputSnapshot {
    * browsers blank out `label` before that, so the names are placeholders.
    */
   hasLabels: boolean;
+  /** The API does not exist at all in this browser/context. Permanent. */
   supported: boolean;
+  /**
+   * enumerateDevices exists but threw on the last attempt. Transient —
+   * distinct from `supported: false`, and worth retrying via `refresh()`.
+   */
+  enumerationFailed: boolean;
 }
 
 const EMPTY: AudioInputSnapshot = {
   devices: [],
   hasLabels: false,
   supported: true,
+  enumerationFailed: false,
 };
 
 /**
@@ -46,6 +53,7 @@ async function readAudioInputs(): Promise<AudioInputSnapshot> {
 
     return {
       supported: true,
+      enumerationFailed: false,
       hasLabels: inputs.some((device) => device.label !== ""),
       devices: inputs.map((device, index) => ({
         deviceId: device.deviceId,
@@ -53,7 +61,8 @@ async function readAudioInputs(): Promise<AudioInputSnapshot> {
       })),
     };
   } catch {
-    return { ...EMPTY, supported: false };
+    // The API exists but this attempt failed — transient, retryable.
+    return { ...EMPTY, enumerationFailed: true };
   }
 }
 

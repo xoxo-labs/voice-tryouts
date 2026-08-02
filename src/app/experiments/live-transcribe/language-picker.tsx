@@ -164,11 +164,16 @@ export function LanguagePicker({
       </div>
 
       <p className="text-muted-foreground text-xs">
-        {atCapacity
-          ? `Maximum of ${MAX_LANGUAGES} languages reached.`
-          : `Sent as `}
-        {atCapacity ? null : (
-          <code className="font-mono">{JSON.stringify(value)}</code>
+        {atCapacity ? (
+          `Maximum of ${MAX_LANGUAGES} languages reached.`
+        ) : value.length === 0 ? (
+          // Verified against the live API: auto-detect requires omitting the
+          // field — an empty array is rejected with 400.
+          "The languages field is omitted entirely — the API auto-detects."
+        ) : (
+          <>
+            Sent as <code className="font-mono">{JSON.stringify(value)}</code>
+          </>
         )}
       </p>
     </div>

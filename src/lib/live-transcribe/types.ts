@@ -206,13 +206,12 @@ export interface TokenCacheState {
 
 export type ConnectionStatus =
   | "idle"
-  /** Token mint and media capture run concurrently in this phase. */
+  /** Token mint, mic capture and SDP offer all run concurrently here. */
   | "preparing"
-  | "minting-token"
-  | "requesting-mic"
-  | "negotiating"
+  /** SDP POSTed, waiting for the peer connection to come up. */
   | "connecting"
   | "connected"
+  /** Final commit sent, waiting briefly for the last `completed`. */
   | "stopping"
   | "error";
 
@@ -248,8 +247,3 @@ export interface IcePathInfo {
   roundTripMs: number | null;
 }
 
-export interface TokenResponse {
-  value: string;
-  expires_at: number;
-  session?: unknown;
-}

@@ -68,7 +68,7 @@ export interface ConnectionTestSummary {
   icePath: IcePathInfo | null;
 }
 
-const MIC_LISTEN_MS = 700;
+const MIC_LISTEN_MS = 1500;
 const MIC_SILENCE_THRESHOLD = 0.0008;
 const ROUNDTRIP_TIMEOUT_MS = 15_000;
 const HANDSHAKE_TIMEOUT_MS = 12_000;
@@ -90,13 +90,40 @@ export async function runConnectionTest(
   const { settings, capture, includeMicrophone, onProgress, signal } = options;
   const region = REGION_INFO[settings.region];
   const results: StageResult[] = [];
+  const settled = new Set<StageId>();
+  /** The stage currently in flight — exceptions are attributed to it. */
+  let currentStage: StageId | null = null;
 
   const report = (result: StageResult) => {
+    settled.add(result.id as StageId);
+    if (currentStage === result.id) currentStage = null;
     results.push(result);
     onProgress(result);
   };
-  const running = (id: StageId) =>
-    onProgress(stage(id, "running", "Checking…"));
+  const running = (id: StageId, detail = "Checking…") => {
+    currentStage = id;
+    onProgress(stage(id, "running", detail));
+  };
+
+  /**
+   * Close out every stage that never got a verdict. A user's cancel must
+   * produce "skipped — cancelled", not a fabricated network diagnosis; an
+   * exception must be pinned on the stage that actually threw, with the rest
+   * skipped instead of left spinning forever.
+   */
+  const settleRemaining = (why: string) => {
+    for (const id of STAGE_IDS) {
+      if (!settled.has(id)) report(stage(id, "skip", why));
+    }
+  };
+
+  /** Every exit goes through here so no stage is ever left dangling. */
+  const finishTest = (skipReason: string) => {
+    settleRemaining(
+      signal.aborted ? "Skipped — the test was cancelled." : skipReason,
+    );
+    return finish(results, icePath, cleanup, signal.aborted);
+  };
 
   let pc: RTCPeerConnection | null = null;
   let synthetic: Awaited<ReturnType<typeof createSyntheticSource>> | null = null;
@@ -142,7 +169,7 @@ export async function runConnectionTest(
         ),
       );
       if (!body.ok) {
-        return finish(results, icePath, cleanup);
+        return finishTest("Skipped — an earlier stage failed, so this one was never reached.");
       }
     } catch (cause) {
       report(
@@ -155,7 +182,7 @@ export async function runConnectionTest(
           { remedy: "Is the dev server still running on this origin?" },
         ),
       );
-      return finish(results, icePath, cleanup);
+      return finishTest("Skipped — an earlier stage failed, so this one was never reached.");
     }
 
     // ------------------------------------------------------------ 2. mint
@@ -193,7 +220,7 @@ export async function runConnectionTest(
             },
           ),
         );
-        return finish(results, icePath, cleanup);
+        return finishTest("Skipped — an earlier stage failed, so this one was never reached.");
       }
 
       ephemeralKey = body.value;
@@ -215,7 +242,7 @@ export async function runConnectionTest(
           }`,
         ),
       );
-      return finish(results, icePath, cleanup);
+      return finishTest("Skipped — an earlier stage failed, so this one was never reached.");
     }
 
     // ------------------------------------------------------ 3+4. microphone
@@ -288,7 +315,10 @@ export async function runConnectionTest(
       // The check that would have saved a whole session: is the device
       // actually producing sound, or is it silently delivering digital zero?
       if (micStream) {
-        running("mic-audio");
+        running(
+          "mic-audio",
+          "Listening for 1.5 s — say something into the microphone now.",
+        );
         try {
           const ctx = new AudioContext();
           await ctx.resume();
@@ -307,20 +337,25 @@ export async function runConnectionTest(
           await ctx.close().catch(() => {});
 
           const loud = peak > MIC_SILENCE_THRESHOLD;
+          // Silence is a WARN, not a fail: microphones with hardware noise
+          // gates output digital zero until they hear sound, and the user may
+          // simply have stayed quiet during the listen window. The wording
+          // still makes the "device opens but delivers silence" case
+          // unmissable — it just doesn't false-fail a healthy gated mic.
           report(
             stage(
               "mic-audio",
-              loud ? "pass" : "fail",
+              loud ? "pass" : "warn",
               loud
                 ? `Captured sound: peak RMS ${peak.toFixed(4)} over ${MIC_LISTEN_MS} ms.`
-                : `The microphone produced no sound — peak RMS was ${peak.toFixed(4)} over ${MIC_LISTEN_MS} ms, at or below the silence floor. The device opens fine but delivers silence.`,
+                : `The microphone produced no sound — peak RMS was ${peak.toFixed(4)} over ${MIC_LISTEN_MS} ms. If you spoke during the test, the device is delivering silence and live transcription will silently produce nothing. If you stayed quiet (or the mic has a hardware noise gate), re-run and talk through the whole listen window.`,
               {
                 data: { peakRms: Number(peak.toFixed(5)) },
                 remedy: loud
                   ? peak < 0.005
                     ? "Level is very low; expect degraded accuracy. Move closer or raise the input gain."
                     : undefined
-                  : "Check the OS input device and volume, any hardware mute switch, and whether another app has exclusive use of the microphone.",
+                  : "Speak during the test. If it stays silent: check the OS input device and volume, any hardware mute switch, and whether another app holds the microphone.",
               },
             ),
           );
@@ -340,7 +375,7 @@ export async function runConnectionTest(
       }
     }
 
-    if (signal.aborted) return finish(results, icePath, cleanup);
+    if (signal.aborted) return finishTest("Skipped — an earlier stage failed, so this one was never reached.");
 
     // -------------------------------------------- 5-9. the API round trip
     synthetic = await createSyntheticSource(8);
@@ -429,7 +464,7 @@ export async function runConnectionTest(
       report(
         stage("sdp", "fail", "The browser produced no local SDP offer to send."),
       );
-      return finish(results, icePath, cleanup);
+      return finishTest("Skipped — an earlier stage failed, so this one was never reached.");
     }
 
     const sdpStart = performance.now();
@@ -462,7 +497,7 @@ export async function runConnectionTest(
             },
           ),
         );
-        return finish(results, icePath, cleanup);
+        return finishTest("Skipped — an earlier stage failed, so this one was never reached.");
       }
 
       report(
@@ -484,13 +519,13 @@ export async function runConnectionTest(
           { remedy: "Check for a proxy or extension blocking the request." },
         ),
       );
-      return finish(results, icePath, cleanup);
+      return finishTest("Skipped — an earlier stage failed, so this one was never reached.");
     }
 
-    await pc.setRemoteDescription({ type: "answer", sdp: answerSdp });
-
-    // Data channel + session.created
+    // Data channel + session.created. `running` is set BEFORE
+    // setRemoteDescription so an exception there is attributed to this stage.
     running("datachannel");
+    await pc.setRemoteDescription({ type: "answer", sdp: answerSdp });
     const handshakeUntil = performance.now() + HANDSHAKE_TIMEOUT_MS;
     while (
       (!dcOpen || !sessionCreated) &&
@@ -498,6 +533,12 @@ export async function runConnectionTest(
       !signal.aborted
     ) {
       await wait(50);
+    }
+
+    // A cancel is a cancel — reporting the timeout verdict after an abort
+    // would turn the user's own click into a fake network diagnosis.
+    if (signal.aborted && (!dcOpen || !sessionCreated)) {
+      return finishTest("Skipped — the test was cancelled.");
     }
 
     report(
@@ -535,7 +576,7 @@ export async function runConnectionTest(
           "Skipped because the session was never established, so there was nothing to send audio to.",
         ),
       );
-      return finish(results, icePath, cleanup);
+      return finishTest("Skipped — an earlier stage failed, so this one was never reached.");
     }
 
     // Round trip
@@ -548,6 +589,10 @@ export async function runConnectionTest(
       !serverError
     ) {
       await wait(100);
+    }
+
+    if (signal.aborted && deltaCount === 0) {
+      return finishTest("Skipped — the test was cancelled.");
     }
 
     let packetsSent = 0;
@@ -638,18 +683,33 @@ export async function runConnectionTest(
       ),
     );
 
-    return finish(results, icePath, cleanup);
+    return finishTest("Skipped — an earlier stage failed, so this one was never reached.");
   } catch (cause) {
+    // A user abort surfaces here as an AbortError from fetch — that is a
+    // cancel, not a failure of whatever stage happened to be in flight.
+    if (
+      signal.aborted ||
+      (cause instanceof DOMException && cause.name === "AbortError")
+    ) {
+      return finishTest("Skipped — the test was cancelled.");
+    }
+
+    // Attribute the exception to the stage that was actually running when it
+    // threw (createOffer, setRemoteDescription, etc. run under a stage), and
+    // never blame a stage that had already settled or was never reached.
+    const blame: StageId = currentStage ?? "roundtrip";
     report(
       stage(
-        "roundtrip",
+        blame,
         "fail",
-        `The test stopped unexpectedly: ${
+        `This stage threw unexpectedly: ${
           cause instanceof Error ? cause.message : "unknown error"
         }`,
       ),
     );
-    return finish(results, icePath, cleanup);
+    return finishTest(
+      "Skipped — the test stopped after an unexpected error in an earlier stage.",
+    );
   }
 }
 
@@ -657,11 +717,21 @@ async function finish(
   results: StageResult[],
   icePath: IcePathInfo | null,
   cleanup: () => Promise<void>,
+  cancelled = false,
 ): Promise<ConnectionTestSummary> {
   await cleanup();
 
   const failed = results.filter((r) => r.status === "fail");
   const warned = results.filter((r) => r.status === "warn");
+
+  if (cancelled && failed.length === 0) {
+    return {
+      ok: false,
+      headline: "Test cancelled before completion.",
+      advice: "Run it again to get a full verdict.",
+      icePath,
+    };
+  }
 
   if (failed.length > 0) {
     const first = failed[0];

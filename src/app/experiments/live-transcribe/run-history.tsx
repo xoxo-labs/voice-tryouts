@@ -10,20 +10,29 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { settingsKey } from "@/lib/live-transcribe/token-cache";
 import {
   computeStats,
   formatMs,
   HEADLINE_METRICS,
   timeToFirstWord,
 } from "@/lib/live-transcribe/timings";
-import type { RunRecord } from "@/lib/live-transcribe/types";
+import type {
+  LiveTranscribeSettings,
+  RunRecord,
+  StartMode,
+} from "@/lib/live-transcribe/types";
 import { cn } from "@/lib/utils";
 
 export function RunHistory({
   runs,
+  currentSettings,
+  currentStartMode,
   onClear,
 }: {
   runs: RunRecord[];
+  currentSettings: LiveTranscribeSettings;
+  currentStartMode: StartMode;
   onClear: () => void;
 }) {
   if (runs.length === 0) {
@@ -35,16 +44,24 @@ export function RunHistory({
     );
   }
 
-  const mixedModes =
-    runs.some((run) => run.startMode === "cold") &&
-    runs.some((run) => run.startMode === "warm");
-  const mixedRegions = new Set(runs.map((r) => r.settings.region)).size > 1;
+  // Tiles aggregate ONLY successful runs whose settings + start mode match
+  // the current selection. Averaging across different delay/noise/language
+  // configurations would erase exactly the differences this tool measures,
+  // and errored runs carry partial marks that poison every statistic.
+  const currentKey = settingsKey(currentSettings);
+  const comparable = runs.filter(
+    (run) =>
+      run.error == null &&
+      run.startMode === currentStartMode &&
+      settingsKey(run.settings) === currentKey,
+  );
+  const excluded = runs.length - comparable.length;
 
   return (
     <div className="flex flex-col gap-6">
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {HEADLINE_METRICS.map((metric) => {
-          const stats = computeStats(runs, metric.select);
+          const stats = computeStats(comparable, metric.select);
           return (
             <div
               key={metric.key}
@@ -92,13 +109,11 @@ export function RunHistory({
 
       <div className="flex items-center justify-between gap-4">
         <p className="text-muted-foreground text-xs">
-          Tiles show the median (p50) across {runs.length} run
-          {runs.length === 1 ? "" : "s"}.
-          {mixedModes
-            ? " History mixes cold and warm starts — setup medians average two different things."
-            : ""}
-          {mixedRegions
-            ? " History mixes US and EU runs — filter by the region badge before drawing conclusions."
+          Tiles aggregate the {comparable.length} successful run
+          {comparable.length === 1 ? "" : "s"} matching the current settings and
+          start mode.
+          {excluded > 0
+            ? ` ${excluded} run${excluded === 1 ? "" : "s"} with different settings or errors ${excluded === 1 ? "is" : "are"} listed below but excluded from the medians.`
             : ""}
         </p>
         <Button variant="ghost" size="sm" onClick={onClear}>
@@ -130,9 +145,20 @@ export function RunHistory({
             {runs.map((run) => {
               const { marks } = run;
               const ttfw = timeToFirstWord(marks);
+              const isComparable = comparable.includes(run);
 
               return (
-                <TableRow key={run.id}>
+                <TableRow
+                  key={run.id}
+                  className={cn(!isComparable && "opacity-55")}
+                  title={
+                    isComparable
+                      ? undefined
+                      : run.error
+                        ? "Errored run — excluded from the medians."
+                        : "Different settings or start mode — excluded from the medians."
+                  }
+                >
                   <TableCell className="font-mono text-xs">
                     {run.index}
                   </TableCell>
@@ -145,7 +171,9 @@ export function RunHistory({
                         {run.settings.noiseReduction}
                       </Badge>
                       <Badge variant="outline" className="font-mono text-[11px]">
-                        {run.settings.languages.join("+")}
+                        {run.settings.languages.length > 0
+                          ? run.settings.languages.join("+")
+                          : "auto"}
                       </Badge>
                       <Badge
                         variant="outline"

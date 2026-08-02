@@ -40,6 +40,11 @@ export function isValidLanguageCode(value: string): boolean {
   return LANGUAGE_CODE.test(value.trim().toLowerCase());
 }
 
+/**
+ * An EMPTY selection is a valid, distinct value meaning "auto-detect" — it
+ * must NOT fall back to a default language. Only a missing/absent field (not
+ * an array at all) falls back, since that means the caller never chose.
+ */
 export function normaliseLanguages(input: unknown): string[] {
   if (!Array.isArray(input)) return DEFAULT_SETTINGS.languages;
   const seen = new Set<string>();
@@ -49,12 +54,7 @@ export function normaliseLanguages(input: unknown): string[] {
     if (LANGUAGE_CODE.test(code)) seen.add(code);
     if (seen.size >= MAX_LANGUAGES) break;
   }
-  return seen.size > 0 ? [...seen] : DEFAULT_SETTINGS.languages;
-}
-
-/** Parse a comma/space separated free-text field into language codes. */
-export function parseLanguageInput(value: string): string[] {
-  return normaliseLanguages(value.split(/[\s,]+/).filter(Boolean));
+  return [...seen];
 }
 
 function isDelay(value: unknown): value is TranscribeDelay {
@@ -100,7 +100,12 @@ export function buildTranscriptionSession(settings: LiveTranscribeSettings) {
             : { type: settings.noiseReduction },
         transcription: {
           model: LIVE_TRANSCRIBE_MODEL,
-          languages: settings.languages,
+          // Auto-detect requires OMITTING the field. Verified against the live
+          // API: no `languages` → 200 with languages:null (auto-detect);
+          // `languages: []` → 400 "Expected an array with minimum length 1".
+          ...(settings.languages.length > 0
+            ? { languages: settings.languages }
+            : {}),
           delay: settings.delay,
         },
       },

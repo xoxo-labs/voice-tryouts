@@ -49,10 +49,13 @@ export function ConnectionTestPanel({
   settings,
   capture,
   disabled,
+  onFailuresChange,
 }: {
   settings: LiveTranscribeSettings;
   capture: CaptureSettings;
   disabled: boolean;
+  /** Reports whether the last completed test contained failures. */
+  onFailuresChange?: (hasFailures: boolean) => void;
 }) {
   const [stages, setStages] = useState<StageResult[]>([]);
   const [summary, setSummary] = useState<ConnectionTestSummary | null>(null);
@@ -80,20 +83,32 @@ export function ConnectionTestPanel({
         includeMicrophone,
         signal: controller.signal,
         onProgress: (stage) => {
+          // Reports from an aborted run must not leak into a newer one.
+          if (controller.signal.aborted) return;
           setStages((prev) => {
             const index = prev.findIndex((s) => s.id === stage.id);
             if (index === -1) return [...prev, stage];
+            // A settled verdict is final — only "running"/"pending"
+            // placeholders may be replaced. A straggling update can therefore
+            // never overwrite a legitimate result.
+            const existing = prev[index];
+            if (existing.status !== "running" && existing.status !== "pending") {
+              return prev;
+            }
             const next = prev.slice();
             next[index] = stage;
             return next;
           });
         },
       });
-      if (!controller.signal.aborted) setSummary(result);
+      if (!controller.signal.aborted) {
+        setSummary(result);
+        onFailuresChange?.(!result.ok);
+      }
     } finally {
       if (!controller.signal.aborted) setIsRunning(false);
     }
-  }, [settings, capture, includeMicrophone]);
+  }, [settings, capture, includeMicrophone, onFailuresChange]);
 
   return (
     <div className="flex flex-col gap-5">
