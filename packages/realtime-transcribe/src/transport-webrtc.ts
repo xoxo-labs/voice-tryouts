@@ -27,6 +27,13 @@ export class WebRtcTransport implements Transport {
   /** WebRTC has no pre-roll — audio only flows once the peer is connected. */
   readonly prerollMs = null;
 
+  /**
+   * Unknown by construction: the browser's media stack appends audio via RTP
+   * without telling us. `null` makes the session fall back to wall time,
+   * which is accurate here — the track streams continuously, silence included.
+   */
+  readonly appendedMsSinceCommit = null;
+
   async prepare(options: TransportPrepareOptions): Promise<void> {
     const { stream, onMessage, mark, log, onFatal } = options;
     this.callbacks = { onMessage, mark, log, onFatal };

@@ -31,8 +31,11 @@ export function VoicePromptInputExperiment() {
   const [committed, setCommitted] = useState("");
   const [sent, setSent] = useState<string[]>([]);
   // Submitting mid-dictation includes the interim tail in the message, so the
-  // finalised version of that same tail must not be re-appended afterwards.
+  // finalised version of that same tail must not be re-appended afterwards —
+  // and its ghost must stop rendering at once, since the session takes a
+  // beat to wind down after stop(). Ref for the callback, state for render.
   const discardTailRef = useRef(false);
+  const [tailDiscarded, setTailDiscarded] = useState(false);
 
   const { listening, interim, error, start, stop } = useVoiceInput({
     onText: (final) => {
@@ -46,6 +49,7 @@ export function VoicePromptInputExperiment() {
       stop();
     } else {
       discardTailRef.current = false;
+      setTailDiscarded(false);
       void start();
     }
   }, [listening, start, stop]);
@@ -55,6 +59,7 @@ export function VoicePromptInputExperiment() {
       const text = message.text.trim();
       if (listening) {
         discardTailRef.current = true;
+        setTailDiscarded(true);
         stop();
       }
       if (text) setSent((prev) => [...prev, text]);
@@ -66,8 +71,13 @@ export function VoicePromptInputExperiment() {
   // While listening, the live interim rides in the textarea value itself. A
   // controlled textarea cannot style a substring, so the ghost text is only
   // implied by the listening indicator — that limitation is stated below
-  // rather than papered over.
-  const value = listening ? append(committed, interim) : committed;
+  // rather than papered over. Typing is paused during dictation (readOnly):
+  // reconciling manual edits with a machine-appended suffix is ambiguous —
+  // the obvious "strip the interim suffix" breaks precisely in the most
+  // common case, typing at the end — and misplacing dictated words is worse
+  // than a brief edit lock.
+  const value =
+    listening && !tailDiscarded ? append(committed, interim) : committed;
 
   return (
     <TooltipProvider>
@@ -79,6 +89,7 @@ export function VoicePromptInputExperiment() {
               <PromptInputTextarea
                 placeholder="Type, or press the mic and just start talking…"
                 value={value}
+                readOnly={listening}
                 onChange={(event) => setCommitted(event.currentTarget.value)}
               />
             </PromptInputBody>
@@ -123,10 +134,12 @@ export function VoicePromptInputExperiment() {
           ) : null}
           <SectionNote>
             While listening, completed utterances are committed into the box;
-            the tail you are still speaking is appended live. A controlled
-            textarea cannot style part of its value, so interim text looks like
-            the rest — the amber indicator is what tells you the tail is still
-            provisional.
+            the tail you are still speaking is appended live, and typing is
+            paused — mixing manual edits with a live machine-appended tail
+            would put words in unpredictable places, so stop the mic to edit.
+            A controlled textarea cannot style part of its value, so interim
+            text looks like the rest — the amber indicator is what tells you
+            the tail is still provisional.
           </SectionNote>
         </section>
 

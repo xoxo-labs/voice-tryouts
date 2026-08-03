@@ -15,6 +15,12 @@ export interface UseVoiceInputOptions {
   /**
    * Fires once per completed utterance with its final transcript. The caller
    * appends this to whatever value it controls (a textarea, a form field).
+   *
+   * If the API reports `transcription.failed` for an item, the text the user
+   * already watched stream in as interim is delivered here anyway (the
+   * accumulated deltas), and `error` is set alongside it. For a dictation
+   * input, silently un-typing words the user saw is worse than keeping a
+   * best-effort transcript and flagging that something went wrong.
    */
   onText: (final: string) => void;
   /**
@@ -44,7 +50,11 @@ export interface UseVoiceInputResult {
   listening: boolean;
   /** Text of the utterance currently being spoken, not yet committed. */
   interim: string;
-  /** Last session error, or null. Cleared on the next `start()`. */
+  /**
+   * Last session or transcription error, or null. Set mid-session when an
+   * item's transcription fails (its interim text still arrives via `onText`,
+   * see {@link UseVoiceInputOptions.onText}). Cleared on the next `start()`.
+   */
   error: string | null;
   /** Begin capturing. Safe to call while already listening (no-op). */
   start: () => Promise<void>;
@@ -57,9 +67,10 @@ export interface UseVoiceInputResult {
  *
  * A deliberately thin ergonomic wrapper over {@link TranscribeSession}: while
  * listening, streaming deltas surface as `interim` (and `onInterim`); each
- * utterance the model finalises fires `onText` exactly once; `stop()` sends a
- * final commit and waits briefly so the tail of speech still arrives as
- * `onText` before the session ends.
+ * utterance the model finalises fires `onText` exactly once; `stop()` flushes
+ * everything the server is still holding — including speech that has not
+ * produced a delta yet — and ends as soon as the tail transcript arrives, so
+ * a short phrase followed by an immediate stop is not lost.
  *
  * Compared to `useLiveTranscribe` (the instrumentation hook) this exposes no
  * timings, event logs, or run history — just text in, text out.
@@ -93,7 +104,7 @@ export function useVoiceInput(options: UseVoiceInputOptions): UseVoiceInputResul
     setListening(true);
 
     const handleUtterances = (utterances: Utterance[]) => {
-      let open = "";
+      const open: string[] = [];
       for (const utterance of utterances) {
         if (utterance.transcript != null) {
           if (!emittedRef.current.has(utterance.itemId)) {
@@ -101,12 +112,22 @@ export function useVoiceInput(options: UseVoiceInputOptions): UseVoiceInputResul
             const text = utterance.transcript.trim();
             if (text) optionsRef.current.onText(text);
           }
-        } else if (utterance.error == null) {
-          open += utterance.delta;
+        } else if (utterance.error != null) {
+          // Failed item: promote the interim the user already saw to final
+          // (best effort beats silent loss), and surface the failure.
+          if (!emittedRef.current.has(utterance.itemId)) {
+            emittedRef.current.add(utterance.itemId);
+            const text = utterance.delta.trim();
+            if (text) optionsRef.current.onText(text);
+            setError(utterance.error);
+          }
+        } else {
+          open.push(utterance.delta);
         }
       }
-      setInterim(open);
-      optionsRef.current.onInterim?.(open);
+      const interimText = open.join(" ");
+      setInterim(interimText);
+      optionsRef.current.onInterim?.(interimText);
     };
 
     const session = new TranscribeSession({

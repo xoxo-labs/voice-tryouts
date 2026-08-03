@@ -3,6 +3,30 @@
   "version": "0.1.0",
   "description": "Transport-agnostic client for OpenAI Realtime transcription sessions (gpt-live-transcribe), with an optional React hooks layer.",
   "license": "MIT",
+  "author": "xoxo labs",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bogris/voice-tryouts.git",
+    "directory": "packages/realtime-transcribe"
+  },
+  "homepage": "https://github.com/bogris/voice-tryouts/tree/main/packages/realtime-transcribe#readme",
+  "bugs": "https://github.com/bogris/voice-tryouts/issues",
+  "keywords": [
+    "openai",
+    "realtime",
+    "transcription",
+    "speech-to-text",
+    "dictation",
+    "voice-input",
+    "gpt-live-transcribe",
+    "webrtc",
+    "websocket",
+    "react",
+    "hooks"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
   "type": "module",
   "sideEffects": false,
   "publishConfig": {
@@ -19,14 +43,16 @@
     "./react": {
       "types": "./dist/react/index.d.ts",
       "default": "./dist/react/index.js"
-    }
+    },
+    "./package.json": "./package.json"
   },
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
     "prepack": "tsup",
     "lint": "eslint .",
-    "check-types": "tsc --noEmit"
+    "check-types": "tsc --noEmit",
+    "check-publish": "publint && attw --pack . --profile esm-only"
   },
   "peerDependencies": {
     "react": "^18.0.0 || ^19.0.0"
@@ -37,10 +63,12 @@
     }
   },
   "devDependencies": {
+    "@arethetypeswrong/cli": "^0.18.5",
     "@types/react": "^19",
     "@xoxo-labs/eslint-config": "workspace:*",
     "@xoxo-labs/typescript-config": "workspace:*",
     "eslint": "^9",
+    "publint": "^0.3.22",
     "react": "19.2.4",
     "tsup": "^8.5.1",
     "typescript": "^5"

@@ -49,6 +49,15 @@ export interface Transport {
   getAudioStats(): Promise<AudioStats | null>;
   /** ws-preroll: flushed backlog duration in ms; null elsewhere. */
   readonly prerollMs: number | null;
+  /**
+   * Milliseconds of audio delivered to the server's input buffer since the
+   * last `input_audio_buffer.commit` went out — the exact number for WS
+   * (which appends every chunk itself), `null` for WebRTC (RTP flows outside
+   * the client's accounting; the caller falls back to elapsed wall time,
+   * which is equivalent there because the media track streams continuously,
+   * silence included).
+   */
+  readonly appendedMsSinceCommit: number | null;
   /** Idempotent teardown of everything the transport created. */
   close(): Promise<void>;
 }

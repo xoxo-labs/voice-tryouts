@@ -33,6 +33,7 @@ export class WsTransport implements Transport {
   private callbacks: TransportCallbacks | null = null;
   private appendedBytes = 0;
   private appendedChunks = 0;
+  private appendedMs = 0;
   private sessionReady = false;
   private flushedPrerollMs: number | null = null;
 
@@ -40,6 +41,11 @@ export class WsTransport implements Transport {
 
   get prerollMs(): number | null {
     return this.flushedPrerollMs;
+  }
+
+  /** Exact server-buffer accounting: summed from appends, reset per commit. */
+  get appendedMsSinceCommit(): number {
+    return this.appendedMs;
   }
 
   async prepare(options: TransportPrepareOptions): Promise<void> {
@@ -143,7 +149,10 @@ export class WsTransport implements Transport {
     if (sent) {
       this.appendedChunks += 1;
       // base64 length ≈ 4/3 of the raw bytes.
-      this.appendedBytes += Math.floor((base64.length * 3) / 4);
+      const bytes = Math.floor((base64.length * 3) / 4);
+      this.appendedBytes += bytes;
+      // 24 kHz mono PCM16 = 48 bytes per millisecond.
+      this.appendedMs += bytes / 48;
     }
   }
 
@@ -152,6 +161,11 @@ export class WsTransport implements Transport {
     if (!ws || ws.readyState !== WebSocket.OPEN) return false;
     try {
       ws.send(JSON.stringify(event));
+      // A commit empties the server-side input buffer; track it here so the
+      // accounting stays correct no matter who initiates the commit.
+      if ((event as { type?: string }).type === "input_audio_buffer.commit") {
+        this.appendedMs = 0;
+      }
       return true;
     } catch {
       return false;

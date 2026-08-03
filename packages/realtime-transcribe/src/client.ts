@@ -21,6 +21,12 @@ const ACTIVITY_WINDOW_MS = 900;
 export const IDLE_COMMIT_MS = 1500;
 /** How long `stop()` waits for the final `completed` after its commit. */
 const FINAL_COMMIT_GRACE_MS = 1500;
+/**
+ * Smallest buffer worth committing. The API rejects commits below 100 ms with
+ * `input_audio_buffer_commit_empty` (verified live, Aug 2026); the margin
+ * absorbs rounding in the client-side accounting.
+ */
+const MIN_COMMIT_AUDIO_MS = 120;
 /** Cadence of the activity/idle-commit checker. */
 const TICK_MS = 250;
 /** Poll audio stats every Nth tick. */
@@ -129,6 +135,16 @@ export class TranscribeSession {
   private utteranceOrder: string[] = [];
   private eventSeq = 0;
   private lastDeltaAt: number | null = null;
+  private connectedAt: number | null = null;
+  private lastCommitAt: number | null = null;
+  /**
+   * Commits sent whose resulting item has not yet resolved. Every commit of a
+   * non-empty buffer yields exactly one `completed` or `failed` — verified
+   * live even for pure silence (empty transcript). This is what lets
+   * `stop()` end the moment the tail is in, instead of always burning the
+   * full grace period.
+   */
+  private pendingCommits = 0;
   private tick: ReturnType<typeof setInterval> | null = null;
   private onsetTimer: ReturnType<typeof setInterval> | null = null;
   private stopTimer: ReturnType<typeof setTimeout> | null = null;
@@ -241,29 +257,43 @@ export class TranscribeSession {
 
       case "conversation.item.input_audio_transcription.completed": {
         this.mark("firstCompleted");
-        if (!event.item_id) break;
-        const finalText = event.transcript;
-        const completedAt = this.elapsed();
-        this.upsertUtterance(event.item_id, (current) => ({
-          ...current,
-          transcript:
-            typeof finalText === "string" ? finalText : current.delta,
-          completedAt,
-        }));
+        this.pendingCommits = Math.max(0, this.pendingCommits - 1);
+        if (event.item_id) {
+          const finalText = event.transcript;
+          const completedAt = this.elapsed();
+          this.upsertUtterance(event.item_id, (current) => ({
+            ...current,
+            transcript:
+              typeof finalText === "string" ? finalText : current.delta,
+            completedAt,
+          }));
+        }
+        this.maybeFinishStopping();
         break;
       }
 
       case "conversation.item.input_audio_transcription.failed": {
-        if (!event.item_id) break;
-        const message = event.error?.message ?? "Transcription failed.";
-        this.upsertUtterance(event.item_id, (current) => ({
-          ...current,
-          error: message,
-        }));
+        this.pendingCommits = Math.max(0, this.pendingCommits - 1);
+        if (event.item_id) {
+          const message = event.error?.message ?? "Transcription failed.";
+          this.upsertUtterance(event.item_id, (current) => ({
+            ...current,
+            error: message,
+          }));
+        }
+        this.maybeFinishStopping();
         break;
       }
 
       case "error":
+        // A commit that raced an already-empty buffer is benign: the session
+        // survives it (verified live) and it means there was nothing left to
+        // flush — not a failure worth surfacing to the caller.
+        if (event.error?.code === "input_audio_buffer_commit_empty") {
+          this.pendingCommits = Math.max(0, this.pendingCommits - 1);
+          this.maybeFinishStopping();
+          break;
+        }
         this.lastError =
           event.error?.message ?? "The Realtime API reported an error.";
         break;
@@ -277,9 +307,41 @@ export class TranscribeSession {
     const sent = this.transport?.send({ type: "input_audio_buffer.commit" });
     if (!sent) return false;
     this.lastDeltaAt = null;
+    this.lastCommitAt = performance.now();
+    this.pendingCommits += 1;
     this.mark("firstCommit");
     this.log("→ input_audio_buffer.commit", { sentByClient: true }, true);
     return true;
+  }
+
+  /**
+   * Whether the server's input buffer holds audio worth flushing at stop.
+   * A delta since the last commit proves it. Otherwise fall back to how much
+   * audio actually went up since then: exact for WS (the transport counts its
+   * own appends), elapsed wall time for WebRTC (RTP streams continuously, so
+   * time connected IS audio appended). This is the fix for the classic
+   * dictation loss: speak a short phrase, hit stop before the first delta.
+   */
+  private hasUncommittedAudio(): boolean {
+    if (this.lastDeltaAt != null) return true;
+    const appended = this.transport?.appendedMsSinceCommit;
+    if (appended != null) return appended >= MIN_COMMIT_AUDIO_MS;
+    const since = this.lastCommitAt ?? this.connectedAt;
+    return since != null && performance.now() - since >= MIN_COMMIT_AUDIO_MS;
+  }
+
+  /**
+   * While stopping, end as soon as every commit has resolved and no item is
+   * still open — the grace timer then only covers the pathological cases
+   * (server never answers, connection dies mid-flush).
+   */
+  private maybeFinishStopping(): void {
+    if (this.ended || this.stopTimer == null) return;
+    if (this.pendingCommits > 0) return;
+    for (const utterance of this.utterances.values()) {
+      if (utterance.transcript == null && utterance.error == null) return;
+    }
+    this.end(null);
   }
 
   // ------------------------------------------------------------ lifecycle
@@ -391,6 +453,7 @@ export class TranscribeSession {
       if (this.ended) return;
 
       this.setStatus("connected");
+      this.connectedAt = performance.now();
       this.startTick();
     } catch (cause) {
       if (this.ended) return;
@@ -414,15 +477,25 @@ export class TranscribeSession {
     }
   }
 
-  /** Graceful stop: flush the open item, wait briefly for its `completed`. */
+  /**
+   * Graceful stop: flush whatever audio the server is still holding —
+   * whether or not it has produced a delta yet — then end as soon as every
+   * outstanding commit has resolved, or at the grace deadline, whichever
+   * comes first.
+   *
+   * Known limitation: stopping BEFORE the session is live discards the
+   * ws-preroll backlog — flushing it would mean holding the session open
+   * through connect + transcribe after the user asked to stop. Post-
+   * connection audio is always flushed.
+   */
   stop(): void {
     if (this.ended) return;
-    if (this.stopTimer == null && this.lastDeltaAt != null) {
-      if (this.sendCommit()) {
-        this.setStatus("stopping");
-        this.stopTimer = setTimeout(() => this.end(null), FINAL_COMMIT_GRACE_MS);
-        return;
-      }
+    if (this.stopTimer != null) return; // already stopping
+    const flushed = this.hasUncommittedAudio() && this.sendCommit();
+    if (flushed || this.pendingCommits > 0) {
+      this.setStatus("stopping");
+      this.stopTimer = setTimeout(() => this.end(null), FINAL_COMMIT_GRACE_MS);
+      return;
     }
     this.end(null);
   }

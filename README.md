@@ -25,5 +25,15 @@ The `OPENAI_API_KEY` is read at boot by `apps/web`; restart the dev server after
 editing `.env.local`. See `apps/web/README.md` for the experiments themselves
 and the model-behaviour notes.
 
+### Editing the library while `pnpm dev` runs
+
+`turbo dev` runs two persistent tasks side by side: `next dev` for the app and
+`tsup --watch` for `packages/realtime-transcribe`. Saving a lib source file
+rebuilds `dist/` in-place within a second or two (the watcher deliberately does
+not clean `dist/` on startup, so the app never sees it missing). The app
+resolves the package from `dist/`, not from `src/` — if a change does not seem
+to arrive, check the tsup watcher output first, and reload the page; type
+changes may additionally need the editor's TS server restarted.
+
 Note: Next.js 16 has real breaking changes — see `AGENTS.md`, which points at
 the docs vendored in `apps/web/node_modules/next/dist/docs/`.
