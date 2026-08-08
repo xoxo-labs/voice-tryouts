@@ -1,16 +1,16 @@
 {
   "name": "@xoxo-labs/realtime-transcribe",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Transport-agnostic client for OpenAI Realtime transcription sessions (gpt-live-transcribe), with an optional React hooks layer.",
   "license": "MIT",
   "author": "xoxo labs",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/bogris/voice-tryouts.git",
+    "url": "git+https://github.com/xoxo-labs/voice-tryouts.git",
     "directory": "packages/realtime-transcribe"
   },
-  "homepage": "https://github.com/bogris/voice-tryouts/tree/main/packages/realtime-transcribe#readme",
-  "bugs": "https://github.com/bogris/voice-tryouts/issues",
+  "homepage": "https://github.com/xoxo-labs/voice-tryouts/tree/main/packages/realtime-transcribe#readme",
+  "bugs": "https://github.com/xoxo-labs/voice-tryouts/issues",
   "keywords": [
     "openai",
     "realtime",
@@ -64,13 +64,13 @@
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "^0.18.5",
-    "@types/react": "^19",
+    "@types/react": "^19.2.18",
     "@xoxo-labs/eslint-config": "workspace:*",
     "@xoxo-labs/typescript-config": "workspace:*",
-    "eslint": "^9",
-    "publint": "^0.3.22",
-    "react": "19.2.4",
+    "eslint": "^9.39.5",
+    "publint": "^0.3.23",
+    "react": "19.2.8",
     "tsup": "^8.5.1",
-    "typescript": "^5"
+    "typescript": "^5.9.3"
   }
 }
