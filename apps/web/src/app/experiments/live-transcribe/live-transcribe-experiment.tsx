@@ -9,6 +9,7 @@ import {
   TabsTrigger,
 } from "@/components/ui/tabs";
 import { useAudioInputDevices } from "@/hooks/use-audio-input-devices";
+import { useDemoSessionCap } from "@/hooks/use-demo-session-cap";
 import { useLiveTranscribe } from "@xoxo-labs/realtime-transcribe/react";
 import { DEFAULT_REGION, type Region } from "@xoxo-labs/realtime-transcribe";
 import type {
@@ -71,6 +72,8 @@ export function LiveTranscribeExperiment({
     stop,
     clearRuns,
   } = useLiveTranscribe();
+
+  useDemoSessionCap(isActive, stop);
 
   // Labels are blank until permission has been granted once, so re-enumerate
   // as soon as a run gets past the getUserMedia prompt.

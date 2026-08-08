@@ -14,6 +14,7 @@ import {
   type PromptInputMessage,
 } from "@/components/ai-elements/prompt-input";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { useDemoSessionCap } from "@/hooks/use-demo-session-cap";
 import { useVoiceInput } from "@xoxo-labs/realtime-transcribe/react";
 import { cn } from "@/lib/utils";
 
@@ -43,6 +44,8 @@ export function VoicePromptInputExperiment() {
       setCommitted((prev) => append(prev, final));
     },
   });
+
+  useDemoSessionCap(listening, stop);
 
   const toggleMic = useCallback(() => {
     if (listening) {
