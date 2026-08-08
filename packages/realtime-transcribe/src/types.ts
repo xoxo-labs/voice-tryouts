@@ -72,7 +72,7 @@ export const DEFAULT_SETTINGS: LiveTranscribeSettings = {
   noiseReduction: "near_field",
   languages: ["en"],
   region: DEFAULT_REGION,
-  transport: "webrtc",
+  transport: "ws-preroll",
 };
 
 /**

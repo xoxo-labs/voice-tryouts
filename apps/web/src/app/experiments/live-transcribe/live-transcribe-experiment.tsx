@@ -31,7 +31,7 @@ import { TimingsTable } from "./timings-table";
 import { TranscriptPanel } from "./transcript-panel";
 
 export function LiveTranscribeExperiment({
-  defaultTransport = "webrtc",
+  defaultTransport = "ws-preroll",
 }: {
   defaultTransport?: TransportKind;
 }) {
