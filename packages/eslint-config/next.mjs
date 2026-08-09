@@ -17,6 +17,8 @@ export const nextJsConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Local `vercel build` output (gitignored, but the linter still walks it).
+    ".vercel/**",
   ]),
 ]);
 
