@@ -24,12 +24,15 @@ run anywhere, which is what a server token route needs.
 ## Live demo
 
 Both hooks, running against the live API at
-[voice-tryouts.vercel.app](https://voice-tryouts.vercel.app):
+[transcribe.xoxo-labs.com](https://transcribe.xoxo-labs.com):
 
-- [**live-transcribe**](https://voice-tryouts.vercel.app/experiments/live-transcribe)
+- [**live-transcribe**](https://transcribe.xoxo-labs.com/experiments/live-transcribe)
   — `useLiveTranscribe`, the fully instrumented session.
-- [**voice-prompt-input**](https://voice-tryouts.vercel.app/experiments/voice-prompt-input)
+- [**voice-prompt-input**](https://transcribe.xoxo-labs.com/experiments/voice-prompt-input)
   — `useVoiceInput` dictating into an AI Elements composer.
+- [**How the model behaves**](https://transcribe.xoxo-labs.com/experiments/live-transcribe/behaviour)
+  — empirically observed behaviour of `gpt-live-transcribe`: text lifecycle,
+  which events arrive, expected latencies, troubleshooting.
 
 The demo mints its client secrets server-side, exactly as described below, so
 no API key reaches the browser. Sessions there are capped at 3 minutes and

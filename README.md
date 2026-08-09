@@ -4,12 +4,13 @@ Experiments with live voice APIs, as a pnpm + Turborepo monorepo.
 
 ## Live demo
 
-Deployed at **[voice-tryouts.vercel.app](https://voice-tryouts.vercel.app)**:
+Deployed at **[transcribe.xoxo-labs.com](https://transcribe.xoxo-labs.com)**:
 
 | Demo | What it shows |
 | --- | --- |
-| [live-transcribe](https://voice-tryouts.vercel.app/experiments/live-transcribe) | `useLiveTranscribe` — the fully instrumented session: transports, timing marks, event log, run history. |
-| [voice-prompt-input](https://voice-tryouts.vercel.app/experiments/voice-prompt-input) | `useVoiceInput` — dictation into an AI Elements composer. |
+| [live-transcribe](https://transcribe.xoxo-labs.com/experiments/live-transcribe) | `useLiveTranscribe` — the fully instrumented session: transports, timing marks, event log, run history. |
+| [voice-prompt-input](https://transcribe.xoxo-labs.com/experiments/voice-prompt-input) | `useVoiceInput` — dictation into an AI Elements composer. |
+| [behaviour](https://transcribe.xoxo-labs.com/experiments/live-transcribe/behaviour) | How `gpt-live-transcribe` behaves in practice: text lifecycle, events, expected latencies, troubleshooting. |
 
 The client secrets are minted server-side, so the `OPENAI_API_KEY` never reaches
 the browser. Sessions on the hosted demo are capped at 3 minutes and

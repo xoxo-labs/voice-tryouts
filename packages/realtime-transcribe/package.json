@@ -1,6 +1,6 @@
 {
   "name": "@xoxo-labs/realtime-transcribe",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Transport-agnostic client for OpenAI Realtime transcription sessions (gpt-live-transcribe), with an optional React hooks layer.",
   "license": "MIT",
   "author": "xoxo labs",
@@ -9,7 +9,7 @@
     "url": "git+https://github.com/xoxo-labs/voice-tryouts.git",
     "directory": "packages/realtime-transcribe"
   },
-  "homepage": "https://voice-tryouts.vercel.app",
+  "homepage": "https://transcribe.xoxo-labs.com",
   "bugs": "https://github.com/xoxo-labs/voice-tryouts/issues",
   "keywords": [
     "openai",
