@@ -9,7 +9,7 @@
     "url": "git+https://github.com/xoxo-labs/voice-tryouts.git",
     "directory": "packages/realtime-transcribe"
   },
-  "homepage": "https://github.com/xoxo-labs/voice-tryouts/tree/main/packages/realtime-transcribe#readme",
+  "homepage": "https://voice-tryouts.vercel.app",
   "bugs": "https://github.com/xoxo-labs/voice-tryouts/issues",
   "keywords": [
     "openai",

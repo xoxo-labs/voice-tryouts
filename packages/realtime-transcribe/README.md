@@ -21,6 +21,21 @@ ESM-only, by intent. The session itself needs browser APIs (`getUserMedia`,
 (`buildTranscriptionSession`, `normaliseSettings`, region URLs) are pure and
 run anywhere, which is what a server token route needs.
 
+## Live demo
+
+Both hooks, running against the live API at
+[voice-tryouts.vercel.app](https://voice-tryouts.vercel.app):
+
+- [**live-transcribe**](https://voice-tryouts.vercel.app/experiments/live-transcribe)
+  — `useLiveTranscribe`, the fully instrumented session.
+- [**voice-prompt-input**](https://voice-tryouts.vercel.app/experiments/voice-prompt-input)
+  — `useVoiceInput` dictating into an AI Elements composer.
+
+The demo mints its client secrets server-side, exactly as described below, so
+no API key reaches the browser. Sessions there are capped at 3 minutes and
+rate-limited per IP to keep the hosted demo affordable — that cap is the
+demo's, not the library's.
+
 ## Install
 
 ```bash

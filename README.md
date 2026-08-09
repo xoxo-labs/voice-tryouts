@@ -2,6 +2,19 @@
 
 Experiments with live voice APIs, as a pnpm + Turborepo monorepo.
 
+## Live demo
+
+Deployed at **[voice-tryouts.vercel.app](https://voice-tryouts.vercel.app)**:
+
+| Demo | What it shows |
+| --- | --- |
+| [live-transcribe](https://voice-tryouts.vercel.app/experiments/live-transcribe) | `useLiveTranscribe` — the fully instrumented session: transports, timing marks, event log, run history. |
+| [voice-prompt-input](https://voice-tryouts.vercel.app/experiments/voice-prompt-input) | `useVoiceInput` — dictation into an AI Elements composer. |
+
+The client secrets are minted server-side, so the `OPENAI_API_KEY` never reaches
+the browser. Sessions on the hosted demo are capped at 3 minutes and
+rate-limited per IP to keep it affordable; running it locally has no such caps.
+
 ## Map
 
 | Path | What it is |

@@ -11,14 +11,14 @@ export const experiments: Experiment[] = [
     slug: "live-transcribe",
     title: "Live transcription over WebRTC",
     summary:
-      "Streams microphone audio to OpenAI's Realtime API with gpt-live-transcribe and benchmarks every stage of the handshake, down to time-to-first-word.",
+      "Press Start and talk: microphone audio streams to OpenAI's Realtime API over a peer connection with gpt-live-transcribe, and the words land as you speak. Every stage of the handshake is timed, down to time-to-first-word.",
     tags: ["OpenAI Realtime", "gpt-live-transcribe", "WebRTC", "benchmark"],
   },
   {
     slug: "voice-prompt-input",
     title: "Voice input for AI Elements",
     summary:
-      "Wires real API transcription into an AI Elements PromptInput through a mic button: cross-browser dictation with model choice, delay control and pre-roll, instead of the built-in Web Speech mic.",
+      "Press the mic in an AI Elements PromptInput and dictate into it. Real API transcription replaces the built-in Web Speech mic, which buys cross-browser behaviour, model choice, a delay dial and pre-roll. There is no chat backend — submitting echoes the text back at you.",
     tags: ["AI Elements", "gpt-live-transcribe", "ws-preroll", "useVoiceInput"],
   },
 ];
